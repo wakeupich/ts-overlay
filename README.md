@@ -4,7 +4,7 @@
 и помечает тех, у кого выключен микрофон или звук. Работает с **TeamSpeak 3** и **TeamSpeak 6**
 одновременно (выбирается запущенный клиент), живёт в трее и появляется только поверх выбранных игр.
 
-**Скачать:** [последний релиз](../../releases/latest) · `TsOverlay.exe` + самодостаточная сборка.
+**Скачать:** [последний релиз](https://github.com/wakeupich/ts-overlay/releases/latest) · `TsOverlay.exe` + самодостаточная сборка.
 Нужен Windows 10/11 x64; для облегчённой версии — [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/8.0).
 
 ## Что умеет
