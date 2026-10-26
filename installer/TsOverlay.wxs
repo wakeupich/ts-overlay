@@ -1,7 +1,7 @@
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
   <Package Name="TS Overlay"
            Manufacturer="WakeUpich"
-           Version="1.1.4"
+           Version="1.1.5"
            UpgradeCode="8f3c2b1e-7a64-4d9b-9c2e-5e1f0a6d7c31"
            Scope="perUser"
            Compressed="yes">
@@ -45,6 +45,7 @@
     </Feature>
   </Package>
 </Wix>
+
 
 
 

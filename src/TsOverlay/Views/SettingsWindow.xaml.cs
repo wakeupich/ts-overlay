@@ -42,6 +42,16 @@ public partial class SettingsWindow : Window
 
     public event Action? Saved;
 
+    /// <summary>Оверлей перетащили, пока открыты настройки: обновляем рабочую копию,
+    /// иначе Save перезапишет позицию старым значением.</summary>
+    public void SyncCustomPosition(int offsetX, int offsetY)
+    {
+        _working.Overlay.Anchor = "Custom";
+        _working.Overlay.CustomOffsetX = offsetX;
+        _working.Overlay.CustomOffsetY = offsetY;
+        SelectTag(AnchorBox, "Custom");
+    }
+
     private static AppConfig Clone(AppConfig config)
     {
         var json = JsonSerializer.Serialize(config);
@@ -58,6 +68,7 @@ public partial class SettingsWindow : Window
         NotifyBox.IsChecked = config.NotifyOnPermissionRequest;
         CheckUpdatesBox.IsChecked = config.CheckUpdatesOnStart;
         ShowSelfBox.IsChecked = config.ShowSelf;
+        AlwaysShowBox.IsChecked = config.AlwaysShowOverlay;
         HotkeyToggleBox.Text = config.HotkeyToggleOverlay;
         HotkeyHudBox.Text = config.HotkeyTalkingHud;
 
@@ -129,6 +140,7 @@ public partial class SettingsWindow : Window
         _live.NotifyOnPermissionRequest = _working.NotifyOnPermissionRequest;
         _live.CheckUpdatesOnStart = _working.CheckUpdatesOnStart;
         _live.ShowSelf = _working.ShowSelf;
+        _live.AlwaysShowOverlay = _working.AlwaysShowOverlay;
         _live.HotkeyToggleOverlay = _working.HotkeyToggleOverlay;
         _live.HotkeyTalkingHud = _working.HotkeyTalkingHud;
         _live.Ts3ApiKey = _working.Ts3ApiKey.Trim();
@@ -161,6 +173,7 @@ public partial class SettingsWindow : Window
         config.NotifyOnPermissionRequest = NotifyBox.IsChecked == true;
         config.CheckUpdatesOnStart = CheckUpdatesBox.IsChecked == true;
         config.ShowSelf = ShowSelfBox.IsChecked == true;
+        config.AlwaysShowOverlay = AlwaysShowBox.IsChecked == true;
         config.HotkeyToggleOverlay = HotkeyToggleBox.Text.Trim();
         config.HotkeyTalkingHud = HotkeyHudBox.Text.Trim();
 

@@ -15,6 +15,10 @@ public sealed class AppConfig
     public string Ts6Path { get; set; } = "";
 
     public bool OverlayEnabled { get; set; } = true;
+
+    /// <summary>Показывать оверлей поверх любых окон, а не только в выбранных играх.</summary>
+    public bool AlwaysShowOverlay { get; set; }
+
     public bool StartWithWindows { get; set; }
     public bool AutoLaunchTeamSpeak { get; set; }
     public bool ExitWithTeamSpeak { get; set; }

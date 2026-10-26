@@ -51,6 +51,7 @@ public sealed class AppHost
         _tray.PreviewToggled += TogglePreview;
         _tray.ToggleOverlayRequested += TogglePinnedOverlay;
         _tray.TalkingHudRequested += ShowTalkingHud;
+        _tray.AlwaysShowChanged += SetAlwaysShow;
         _tray.StartupChanged += ToggleStartup;
         _tray.RestartRequested += () => _ = _monitor?.RestartAsync();
         _tray.LaunchTeamSpeakRequested += LaunchTeamSpeak;
@@ -75,6 +76,7 @@ public sealed class AppHost
 
         _tray.SetOverlayChecked(Config.OverlayEnabled);
         _tray.SetStartupChecked(StartupService.IsEnabled());
+        _tray.SetAlwaysShowChecked(Config.AlwaysShowOverlay);
         _tray.SetStatus(Config.OverlayEnabled ? "Подключение к TeamSpeak…" : "Оверлей выключен");
         InitHotkeys();
 
@@ -90,6 +92,12 @@ public sealed class AppHost
 
         _monitor.Start();
         Log.Info("TS Overlay запущен");
+
+        if (Config.AlwaysShowOverlay && Config.OverlayEnabled)
+        {
+            _viewModel.Apply(TsSnapshot.Empty, Config);
+            ShowPreview(Config);
+        }
 
         if (Config.CheckUpdatesOnStart)
         {
@@ -185,6 +193,10 @@ public sealed class AppHost
             {
                 ShowOverForeground();
             }
+            else if (Config.AlwaysShowOverlay)
+            {
+                ShowPreview(Config);
+            }
             else if (_preview)
             {
                 ShowPreview(Config);
@@ -219,6 +231,12 @@ public sealed class AppHost
 
             if (!Config.OverlayEnabled)
             {
+                return;
+            }
+
+            if (Config.AlwaysShowOverlay)
+            {
+                // Оверлей всегда на экране, смена активного окна ничего не меняет.
                 return;
             }
 
@@ -333,6 +351,15 @@ public sealed class AppHost
         _tray?.SetStartupChecked(enable);
     }
 
+    private void SetAlwaysShow(bool enabled)
+    {
+        Config.AlwaysShowOverlay = enabled;
+        _configService.Save();
+        _tray?.SetAlwaysShowChecked(enabled);
+        ApplyConfig(restartMonitor: false);
+        Log.Info("Оверлей поверх любых окон: " + (enabled ? "включён" : "выключен"));
+    }
+
     private void UpdateOverlayInteractive()
     {
         if (_overlay == null)
@@ -351,6 +378,7 @@ public sealed class AppHost
         Config.Overlay.CustomOffsetX = offsetX;
         Config.Overlay.CustomOffsetY = offsetY;
         _configService.Save();
+        _settings?.SyncCustomPosition(offsetX, offsetY);
         Log.Info($"Оверлей перетащен: смещение {offsetX},{offsetY}");
     }
 
@@ -593,7 +621,7 @@ public sealed class AppHost
             return;
         }
 
-        if (_preview)
+        if (Config.AlwaysShowOverlay || _preview)
         {
             ShowPreview(Config);
         }
@@ -601,12 +629,17 @@ public sealed class AppHost
         {
             _overlay?.ShowOverGame(_lastGame, Config);
         }
+        else
+        {
+            _overlay?.HideOverlay();
+        }
     }
 
     private void ApplyConfig(bool restartMonitor)
     {
         _tray?.SetOverlayChecked(Config.OverlayEnabled);
         _tray?.SetStartupChecked(StartupService.IsEnabled());
+        _tray?.SetAlwaysShowChecked(Config.AlwaysShowOverlay);
         _gameWatcher?.SetGames(Config.Games);
         _gameWatcher?.SetEnabled(Config.OverlayEnabled);
         InitHotkeys();
@@ -621,6 +654,10 @@ public sealed class AppHost
             _preview = false;
             _tray?.SetPreviewChecked(false);
         }
+        else if (Config.AlwaysShowOverlay)
+        {
+            ShowPreview(Config);
+        }
         else if (_preview)
         {
             ShowPreview(Config);
@@ -628,6 +665,10 @@ public sealed class AppHost
         else if (_lastGame != null)
         {
             _overlay?.ShowOverGame(_lastGame, Config);
+        }
+        else
+        {
+            _overlay?.HideOverlay();
         }
 
         if (restartMonitor)

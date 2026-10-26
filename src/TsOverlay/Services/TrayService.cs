@@ -14,6 +14,7 @@ public sealed class TrayService : IDisposable
     private readonly WinForms.ToolStripMenuItem _startupItem;
     private readonly WinForms.ToolStripMenuItem _toggleItem;
     private readonly WinForms.ToolStripMenuItem _hudItem;
+    private readonly WinForms.ToolStripMenuItem _alwaysItem;
     private readonly IntPtr _iconHandle;
 
     public TrayService()
@@ -28,6 +29,10 @@ public sealed class TrayService : IDisposable
         };
         _toggleItem = new WinForms.ToolStripMenuItem("Показать/скрыть оверлей", null, (_, _) => ToggleOverlayRequested?.Invoke());
         _hudItem = new WinForms.ToolStripMenuItem("Кто говорит (поверх любого окна)", null, (_, _) => TalkingHudRequested?.Invoke());
+        _alwaysItem = new WinForms.ToolStripMenuItem("Поверх любых окон (всегда)", null, (_, _) => AlwaysShowChanged?.Invoke(!_alwaysItem!.Checked))
+        {
+            CheckOnClick = false,
+        };
         _previewItem = new WinForms.ToolStripMenuItem("Показать оверлей на рабочем столе", null, (_, _) => PreviewToggled?.Invoke());
         _startupItem = new WinForms.ToolStripMenuItem("Запускать с Windows", null, (_, _) => StartupChanged?.Invoke(!_startupItem!.Checked));
 
@@ -37,6 +42,7 @@ public sealed class TrayService : IDisposable
         menu.Items.Add(_overlayItem);
         menu.Items.Add(_toggleItem);
         menu.Items.Add(_hudItem);
+        menu.Items.Add(_alwaysItem);
         menu.Items.Add(_previewItem);
         menu.Items.Add(new WinForms.ToolStripMenuItem("Настройки…", null, (_, _) => SettingsRequested?.Invoke()));
         menu.Items.Add(new WinForms.ToolStripSeparator());
@@ -68,6 +74,8 @@ public sealed class TrayService : IDisposable
 
     public event Action? TalkingHudRequested;
 
+    public event Action<bool>? AlwaysShowChanged;
+
     public event Action<bool>? StartupChanged;
 
     public event Action? RestartRequested;
@@ -87,6 +95,8 @@ public sealed class TrayService : IDisposable
     }
 
     public void SetOverlayChecked(bool value) => _overlayItem.Checked = value;
+
+    public void SetAlwaysShowChecked(bool value) => _alwaysItem.Checked = value;
 
     public void SetHotkeys(string toggle, string hud)
     {

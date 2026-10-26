@@ -98,7 +98,8 @@
                         <GroupBox Header="Отображение">
                             <StackPanel>
                                 <CheckBox x:Name="ShowSelfBox" Content="Показывать себя в списке канала" Margin="0,2" />
-                                <TextBlock Text="Оверлей показывается только поверх игр из вкладки «Игры» и только когда игра активна."
+                                <CheckBox x:Name="AlwaysShowBox" Content="Показывать поверх любых окон (всегда)" Margin="0,2" />
+                                <TextBlock Text="Без этой галочки оверлей виден только поверх игр из вкладки «Игры»."
                                            TextWrapping="Wrap" Foreground="#FF44506A" Margin="0,6,0,0" />
                             </StackPanel>
                         </GroupBox>
@@ -139,6 +140,7 @@
                                     <ComboBoxItem Tag="BottomLeft" Content="Слева снизу" />
                                     <ComboBoxItem Tag="BottomCenter" Content="Снизу по центру" />
                                     <ComboBoxItem Tag="BottomRight" Content="Справа снизу" />
+                                    <ComboBoxItem Tag="Custom" Content="Своя позиция (перетаскиванием)" />
                                 </ComboBox>
 
                                 <TextBlock Grid.Column="2" Text="Отступ X / Y" />
