@@ -1,0 +1,309 @@
+<Window x:Class="TsOverlay.Views.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="TS Overlay — настройки"
+        Width="780"
+        Height="660"
+        MinWidth="700"
+        MinHeight="560"
+        WindowStartupLocation="CenterScreen"
+        Background="#FFF3F5F8">
+    <Window.Resources>
+        <Style TargetType="TextBox">
+            <Setter Property="Padding" Value="4,3" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+        <Style TargetType="ComboBox">
+            <Setter Property="Padding" Value="4,2" />
+        </Style>
+        <Style TargetType="GroupBox">
+            <Setter Property="Margin" Value="0,0,0,10" />
+            <Setter Property="Padding" Value="10" />
+        </Style>
+        <Style TargetType="TextBlock">
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Margin" Value="0,0,8,0" />
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="14">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <TabControl Grid.Row="0">
+
+            <!-- ОБЩИЕ -->
+            <TabItem Header="Общие">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="10">
+                        <GroupBox Header="Клиент TeamSpeak">
+                            <StackPanel>
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="150" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Какой клиент использовать" />
+                                    <ComboBox x:Name="ClientModeBox" Grid.Column="1">
+                                        <ComboBoxItem Tag="Auto" Content="Автоматически (запущенный)" />
+                                        <ComboBoxItem Tag="Ts3" Content="Только TeamSpeak 3" />
+                                        <ComboBoxItem Tag="Ts6" Content="Только TeamSpeak 6" />
+                                    </ComboBox>
+                                </Grid>
+                                <TextBlock Text="Статус:" FontWeight="SemiBold" Margin="0,4,0,2" />
+                                <TextBlock x:Name="StatusText" TextWrapping="Wrap" Foreground="#FF44506A" Margin="0,0,0,6" />
+                            </StackPanel>
+                        </GroupBox>
+
+                        <GroupBox Header="Запуск">
+                            <StackPanel>
+                                <CheckBox x:Name="StartWithWindowsBox" Content="Запускать вместе с Windows" Margin="0,2" />
+                                <CheckBox x:Name="AutoLaunchBox" Content="Запускать клиент TeamSpeak вместе с оверлеем" Margin="0,2" />
+                                <CheckBox x:Name="ExitWithTsBox" Content="Закрывать оверлей при выходе из TeamSpeak" Margin="0,2" />
+                                <CheckBox x:Name="NotifyBox" Content="Показывать уведомления (например, запрос доступа TS6)" Margin="0,2" />
+                            </StackPanel>
+                        </GroupBox>
+
+                        <GroupBox Header="Отображение">
+                            <StackPanel>
+                                <CheckBox x:Name="ShowSelfBox" Content="Показывать себя в списке канала" Margin="0,2" />
+                                <TextBlock Text="Оверлей показывается только поверх игр из вкладки «Игры» и только когда игра активна."
+                                           TextWrapping="Wrap" Foreground="#FF44506A" Margin="0,6,0,0" />
+                            </StackPanel>
+                        </GroupBox>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- ОВЕРЛЕЙ -->
+            <TabItem Header="Оверлей">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="10">
+                        <GroupBox Header="Положение и размер">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="150" />
+                                    <ColumnDefinition Width="120" />
+                                    <ColumnDefinition Width="150" />
+                                    <ColumnDefinition Width="120" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="30" />
+                                    <RowDefinition Height="30" />
+                                    <RowDefinition Height="30" />
+                                    <RowDefinition Height="30" />
+                                    <RowDefinition Height="30" />
+                                    <RowDefinition Height="30" />
+                                </Grid.RowDefinitions>
+
+                                <TextBlock Text="Угол экрана" />
+                                <ComboBox x:Name="AnchorBox" Grid.Column="1">
+                                    <ComboBoxItem Tag="TopLeft" Content="Слева сверху" />
+                                    <ComboBoxItem Tag="TopCenter" Content="Сверху по центру" />
+                                    <ComboBoxItem Tag="TopRight" Content="Справа сверху" />
+                                    <ComboBoxItem Tag="LeftCenter" Content="Слева по центру" />
+                                    <ComboBoxItem Tag="RightCenter" Content="Справа по центру" />
+                                    <ComboBoxItem Tag="BottomLeft" Content="Слева снизу" />
+                                    <ComboBoxItem Tag="BottomCenter" Content="Снизу по центру" />
+                                    <ComboBoxItem Tag="BottomRight" Content="Справа снизу" />
+                                </ComboBox>
+
+                                <TextBlock Grid.Column="2" Text="Отступ X / Y" />
+                                <Grid Grid.Column="3">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="8" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox x:Name="MarginXBox" />
+                                    <TextBox x:Name="MarginYBox" Grid.Column="2" />
+                                </Grid>
+
+                                <TextBlock Grid.Row="1" Text="Ширина панели" />
+                                <TextBox x:Name="WidthBox" Grid.Row="1" Grid.Column="1" />
+
+                                <TextBlock Grid.Row="1" Grid.Column="2" Text="Масштаб" />
+                                <TextBox x:Name="ScaleBox" Grid.Row="1" Grid.Column="3" />
+
+                                <TextBlock Grid.Row="2" Text="Высота строки" />
+                                <TextBox x:Name="RowHeightBox" Grid.Row="2" Grid.Column="1" />
+
+                                <TextBlock Grid.Row="2" Grid.Column="2" Text="Размер шрифта" />
+                                <TextBox x:Name="FontSizeBox" Grid.Row="2" Grid.Column="3" />
+
+                                <TextBlock Grid.Row="3" Text="Прозрачность (0.2–1)" />
+                                <TextBox x:Name="OpacityBox" Grid.Row="3" Grid.Column="1" />
+
+                                <TextBlock Grid.Row="3" Grid.Column="2" Text="Максимум строк" />
+                                <TextBox x:Name="MaxRowsBox" Grid.Row="3" Grid.Column="3" />
+
+                                <TextBlock Grid.Row="4" Text="Скругление углов" />
+                                <TextBox x:Name="CornerRadiusBox" Grid.Row="4" Grid.Column="1" />
+
+                                <StackPanel Grid.Row="4" Grid.Column="2" Grid.ColumnSpan="3" Orientation="Horizontal">
+                                    <CheckBox x:Name="ShowHeaderBox" Content="Показывать шапку" Margin="0,0,16,0" VerticalAlignment="Center" />
+                                    <CheckBox x:Name="ShowServerNameBox" Content="Показывать имя сервера" VerticalAlignment="Center" />
+                                </StackPanel>
+
+                                <Button Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="2"
+                                        Content="Предпросмотр на рабочем столе"
+                                        Click="OnPreviewClick"
+                                        HorizontalAlignment="Left"
+                                        Padding="10,3" />
+                            </Grid>
+                        </GroupBox>
+
+                        <GroupBox Header="Цвета (HEX: #AARRGGBB)">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="150" />
+                                    <ColumnDefinition Width="160" />
+                                    <ColumnDefinition Width="20" />
+                                    <ColumnDefinition Width="150" />
+                                    <ColumnDefinition Width="160" />
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="30" />
+                                    <RowDefinition Height="30" />
+                                    <RowDefinition Height="30" />
+                                </Grid.RowDefinitions>
+
+                                <TextBlock Text="Фон панели" />
+                                <TextBox x:Name="BackgroundBox" Grid.Column="1" />
+
+                                <TextBlock Grid.Column="3" Text="Текст" />
+                                <TextBox x:Name="TextColorBox" Grid.Column="4" />
+
+                                <TextBlock Grid.Row="1" Text="Приглушённый текст" />
+                                <TextBox x:Name="DimColorBox" Grid.Row="1" Grid.Column="1" />
+
+                                <TextBlock Grid.Row="1" Grid.Column="3" Text="Говорит" />
+                                <TextBox x:Name="TalkingColorBox" Grid.Row="1" Grid.Column="4" />
+
+                                <TextBlock Grid.Row="2" Text="Микрофон выключен" />
+                                <TextBox x:Name="MutedColorBox" Grid.Row="2" Grid.Column="1" />
+                            </Grid>
+                        </GroupBox>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- ИГРЫ -->
+            <TabItem Header="Игры">
+                <Grid Margin="10">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" TextWrapping="Wrap" Foreground="#FF44506A" Margin="0,0,0,8"
+                               Text="Оверлей появляется только поверх перечисленных игр и только когда окно игры активно. Игру можно добавить по имени процесса." />
+
+                    <ListView x:Name="GamesList" Grid.Row="1" SelectionMode="Extended">
+                        <ListView.View>
+                            <GridView>
+                                <GridViewColumn Header="Вкл" Width="50">
+                                    <GridViewColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <CheckBox IsChecked="{Binding Enabled, UpdateSourceTrigger=PropertyChanged}" HorizontalAlignment="Center" />
+                                        </DataTemplate>
+                                    </GridViewColumn.CellTemplate>
+                                </GridViewColumn>
+                                <GridViewColumn Header="Игра" Width="260" DisplayMemberBinding="{Binding DisplayName}" />
+                                <GridViewColumn Header="Процесс" Width="220" DisplayMemberBinding="{Binding Exe}" />
+                            </GridView>
+                        </ListView.View>
+                    </ListView>
+
+                    <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,8,0,0">
+                        <Button Content="Добавить из запущенных…" Click="OnAddRunning" Padding="10,3" Margin="0,0,8,0" />
+                        <Button Content="Указать .exe…" Click="OnBrowseExe" Padding="10,3" Margin="0,0,8,0" />
+                        <Button Content="Удалить" Click="OnRemoveGame" Padding="10,3" />
+                    </StackPanel>
+                </Grid>
+            </TabItem>
+
+            <!-- ПОДКЛЮЧЕНИЕ -->
+            <TabItem Header="Подключение">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="10">
+                        <GroupBox Header="TeamSpeak 3 — ClientQuery">
+                            <StackPanel>
+                                <TextBlock TextWrapping="Wrap" Margin="0,0,0,8" Foreground="#FF44506A"
+                                           Text="В клиенте TS3 должен быть включён плагин ClientQuery (Настройки → Плагины). Ключ можно взять из файла clientquery.ini автоматически." />
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="90" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Ключ API" />
+                                    <TextBox x:Name="Ts3KeyBox" Grid.Column="1" FontFamily="Consolas" />
+                                    <Button Grid.Column="2" Content="Взять из ini" Click="OnReadClientQueryKey" Margin="8,0,0,0" Padding="8,3" />
+                                </Grid>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="90" />
+                                        <ColumnDefinition Width="120" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Порт" />
+                                    <TextBox x:Name="Ts3PortBox" Grid.Column="1" />
+                                </Grid>
+                            </StackPanel>
+                        </GroupBox>
+
+                        <GroupBox Header="TeamSpeak 6 — Remote Apps">
+                            <StackPanel>
+                                <TextBlock TextWrapping="Wrap" Margin="0,0,0,8" Foreground="#44506A"
+                                           Text="При первом подключении TeamSpeak 6 покажет запрос доступа — разрешите его (Настройки → Remote Apps). Ключ выдаётся автоматически и сохраняется здесь." />
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="90" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Ключ API" />
+                                    <TextBox x:Name="Ts6KeyBox" Grid.Column="1" IsReadOnly="True" FontFamily="Consolas" />
+                                </Grid>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="90" />
+                                        <ColumnDefinition Width="120" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Порт" />
+                                    <TextBox x:Name="Ts6PortBox" Grid.Column="1" />
+                                </Grid>
+                            </StackPanel>
+                        </GroupBox>
+
+                        <GroupBox Header="Пути к клиентам (если установлены нестандартно)">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="90" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="30" />
+                                    <RowDefinition Height="30" />
+                                </Grid.RowDefinitions>
+                                <TextBlock Text="TS3" />
+                                <TextBox x:Name="Ts3PathBox" Grid.Column="1" />
+                                <TextBlock Grid.Row="1" Text="TS6" />
+                                <TextBox x:Name="Ts6PathBox" Grid.Row="1" Grid.Column="1" />
+                            </Grid>
+                        </GroupBox>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+        </TabControl>
+
+        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
+            <Button Content="Открыть журнал" Click="OnOpenLog" Padding="10,3" Margin="0,0,8,0" />
+            <Button Content="Сохранить" IsDefault="True" Width="110" Padding="10,3" Margin="0,0,8,0" Click="OnSave" />
+            <Button Content="Отмена" IsCancel="True" Width="100" Padding="10,3" />
+        </StackPanel>
+    </Grid>
+</Window>

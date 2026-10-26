@@ -1,0 +1,172 @@
+<Window x:Class="TsOverlay.Views.OverlayWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:TsOverlay.ViewModels"
+        Title="TS Overlay"
+        Width="300"
+        Height="200"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        ShowInTaskbar="False"
+        Topmost="True"
+        ResizeMode="NoResize"
+        ShowActivated="False"
+        Focusable="False"
+        IsHitTestVisible="False"
+        SizeToContent="Manual"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True">
+
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
+
+        <Style x:Key="StatusDot" TargetType="Ellipse">
+            <Setter Property="Fill" Value="#66FFFFFF" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsConnected}" Value="True">
+                    <Setter Property="Fill" Value="{Binding TalkingBrush}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="MuteIcon" TargetType="Viewbox">
+            <Setter Property="Width" Value="13" />
+            <Setter Property="Height" Value="13" />
+            <Setter Property="Margin" Value="4,0,2,0" />
+            <Setter Property="Stretch" Value="Uniform" />
+        </Style>
+    </Window.Resources>
+
+    <Border x:Name="RootBorder"
+            CornerRadius="{Binding CornerRadius}"
+            Background="{Binding PanelBackground}"
+            BorderBrush="#33FFFFFF"
+            BorderThickness="1"
+            Opacity="{Binding PanelOpacity}"
+            Padding="10">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <!-- Шапка: канал и сервер -->
+            <StackPanel Grid.Row="0"
+                        Height="{Binding HeaderHeight}"
+                        Visibility="{Binding ShowHeader, Converter={StaticResource BoolToVis}}">
+                <DockPanel LastChildFill="True" Margin="0,0,0,2">
+                    <Ellipse DockPanel.Dock="Left"
+                             Width="7"
+                             Height="7"
+                             Margin="1,0,7,0"
+                             VerticalAlignment="Center"
+                             Style="{StaticResource StatusDot}" />
+                    <TextBlock Text="{Binding HeaderText}"
+                               FontFamily="Segoe UI"
+                               FontSize="{Binding FontSize}"
+                               FontWeight="SemiBold"
+                               Foreground="{Binding TextBrush}"
+                               TextTrimming="CharacterEllipsis"
+                               VerticalAlignment="Center" />
+                </DockPanel>
+                <TextBlock Text="{Binding SubHeaderText}"
+                           FontFamily="Segoe UI"
+                           FontSize="{Binding SubFontSize}"
+                           Foreground="{Binding DimBrush}"
+                           TextTrimming="CharacterEllipsis"
+                           Margin="0,0,0,4" />
+            </StackPanel>
+
+            <!-- Клиенты канала -->
+            <ItemsControl Grid.Row="1"
+                          ItemsSource="{Binding Rows}"
+                          Visibility="{Binding HasRows, Converter={StaticResource BoolToVis}}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="{x:Type vm:ClientRow}">
+                        <Border Height="{Binding RowHeight}"
+                                Background="{Binding TalkingBackground}"
+                                CornerRadius="6"
+                                Padding="5,0"
+                                Margin="0,0,0,1"
+                                ToolTip="{Binding Tooltip}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <Ellipse Grid.Column="0"
+                                         Width="6"
+                                         Height="6"
+                                         Margin="0,0,7,0"
+                                         VerticalAlignment="Center"
+                                         Fill="{Binding StatusBrush}" />
+
+                                <TextBlock Grid.Column="1"
+                                           Text="{Binding Nickname}"
+                                           FontFamily="Segoe UI"
+                                           FontSize="{Binding FontSize}"
+                                           Foreground="{Binding NicknameBrush}"
+                                           TextTrimming="CharacterEllipsis"
+                                           VerticalAlignment="Center">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsSelf}" Value="True">
+                                                    <Setter Property="FontWeight" Value="SemiBold" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+
+                                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <!-- Микрофон выключен -->
+                                    <Viewbox Style="{StaticResource MuteIcon}"
+                                             Visibility="{Binding MicMuted, Converter={StaticResource BoolToVis}}">
+                                        <Canvas Width="24" Height="24">
+                                            <Path Fill="{Binding MutedBrush}"
+                                                  Data="M12,14 a3,3 0 0 0 3,-3 V5 a3,3 0 0 0 -6,0 v6 a3,3 0 0 0 3,3 z M17,11 a5,5 0 0 1 -10,0 H5 a7,7 0 0 0 6,6.92 V21 h2 v-3.08 A7,7 0 0 0 19,11 z" />
+                                            <Line X1="3" Y1="3" X2="21" Y2="21"
+                                                  Stroke="{Binding MutedBrush}"
+                                                  StrokeThickness="2.2"
+                                                  StrokeStartLineCap="Round"
+                                                  StrokeEndLineCap="Round" />
+                                        </Canvas>
+                                    </Viewbox>
+
+                                    <!-- Звук выключен -->
+                                    <Viewbox Style="{StaticResource MuteIcon}"
+                                             Visibility="{Binding Deafened, Converter={StaticResource BoolToVis}}">
+                                        <Canvas Width="24" Height="24">
+                                            <Path Fill="{Binding MutedBrush}"
+                                                  Data="M3,9 v6 h4 l5,5 V4 L7,9 z M16.5,12 a4,4 0 0 0 -2.5,-3.7 v7.4 a4,4 0 0 0 2.5,-3.7 z" />
+                                            <Line X1="4" Y1="20" X2="20" Y2="4"
+                                                  Stroke="{Binding MutedBrush}"
+                                                  StrokeThickness="2.2"
+                                                  StrokeStartLineCap="Round"
+                                                  StrokeEndLineCap="Round" />
+                                        </Canvas>
+                                    </Viewbox>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <!-- Пустое состояние -->
+            <TextBlock Grid.Row="1"
+                       Text="{Binding EmptyText}"
+                       FontFamily="Segoe UI"
+                       FontSize="{Binding FontSize}"
+                       Foreground="{Binding DimBrush}"
+                       TextWrapping="Wrap"
+                       VerticalAlignment="Center"
+                       Margin="2,2,2,4"
+                       Visibility="{Binding ShowEmpty, Converter={StaticResource BoolToVis}}" />
+        </Grid>
+    </Border>
+</Window>
