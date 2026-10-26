@@ -433,7 +433,19 @@ public sealed class AppHost
             using var http = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
             var bytes = await http.GetByteArrayAsync(url);
             await File.WriteAllBytesAsync(path, bytes);
-            Process.Start(new ProcessStartInfo("msiexec.exe", $"/i \"{path}\" /qb") { UseShellExecute = true });
+
+            // Ставим MSI и сразу поднимаем установленную версию: иначе после обновления
+            // оверлей остаётся закрытым и выглядит как «пропал».
+            var installedExe = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "Programs", "TsOverlay", "TsOverlay.exe");
+            var command = $"/c msiexec.exe /i \"{path}\" /qb & ping -n 4 127.0.0.1 >nul & start \"\" \"{installedExe}\"";
+            Process.Start(new ProcessStartInfo("cmd.exe", command)
+            {
+                UseShellExecute = true,
+                WindowStyle = ProcessWindowStyle.Hidden,
+                CreateNoWindow = true,
+            });
             Application.Current.Shutdown();
         }
         catch (Exception ex)
