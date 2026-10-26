@@ -1,0 +1,58 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Build portable and standalone
+        shell: pwsh
+        run: |
+          $v = "${{ github.ref_name }}".TrimStart('v')
+          dotnet publish src/TsOverlay/TsOverlay.csproj -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -o dist
+          dotnet publish src/TsOverlay/TsOverlay.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o dist-standalone
+          Compress-Archive -Path dist-standalone/TsOverlay.exe -DestinationPath "dist/TsOverlay-$v-win-x64-standalone.zip" -CompressionLevel Optimal
+
+      - name: Build MSI
+        shell: pwsh
+        run: |
+          $v = "${{ github.ref_name }}".TrimStart('v')
+          dotnet tool install --global wix --version 5.0.2
+          $wix = "$env:USERPROFILE\.dotnet\tools\wix.exe"
+          & $wix build installer/TsOverlay.wxs -d SourceDir="$PWD\dist" -d IconPath="$PWD\src\TsOverlay\app.ico" -o "dist/TsOverlay-$v-Setup.msi" -arch x64
+
+      - name: Checksums
+        shell: pwsh
+        run: |
+          $files = Get-ChildItem dist | Where-Object { $_.Name -eq 'TsOverlay.exe' -or $_.Name -like '*-Setup.msi' -or $_.Name -like '*-standalone.zip' }
+          $lines = foreach ($f in $files) { "$((Get-FileHash $f.FullName -Algorithm SHA256).Hash.ToLower())  $($f.Name)" }
+          $lines | Set-Content dist/SHA256SUMS.txt -Encoding ascii
+          Get-Content dist/SHA256SUMS.txt
+
+      - name: Publish release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: TS Overlay 1.1.2 — исправлено окно настроек
+          body_path: docs/release-1.1.2.md
+          draft: false
+          prerelease: false
+          fail_on_unmatched_files: true
+          files: |
+            dist/TsOverlay.exe
+            dist/*-Setup.msi
+            dist/*-standalone.zip
+            dist/SHA256SUMS.txt
