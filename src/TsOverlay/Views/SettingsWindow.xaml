@@ -98,7 +98,7 @@
                         <GroupBox Header="Отображение">
                             <StackPanel>
                                 <CheckBox x:Name="ShowSelfBox" Content="Показывать себя в списке канала" Margin="0,2" />
-                                <CheckBox x:Name="AlwaysShowBox" Content="Поверх любых окон, пока запущена игра" Margin="0,2" />
+                                <CheckBox x:Name="AlwaysShowBox" Content="Поверх любых окон (пока игра запущена; без списка игр — всегда)" Margin="0,2" />
                                 <TextBlock Text="Без этой галочки оверлей виден только поверх игр из вкладки «Игры»."
                                            TextWrapping="Wrap" Foreground="#FF44506A" Margin="0,6,0,0" />
                             </StackPanel>
@@ -354,5 +354,6 @@
         </StackPanel>
     </Grid>
 </Window>
+
 
 

@@ -185,3 +185,4 @@ public sealed class TrayService : IDisposable
     private static extern bool DestroyIcon(IntPtr handle);
 }
 
+

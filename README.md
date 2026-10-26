@@ -5,7 +5,7 @@
 одновременно (выбирается запущенный клиент), живёт в трее и появляется только поверх выбранных игр.
 
 **Скачать:** [последний релиз](https://github.com/wakeupich/ts-overlay/releases/latest) ·
-установщик `TsOverlay-1.1.7-Setup.msi` (без прав администратора), портативный `TsOverlay.exe`
+установщик `TsOverlay-1.1.8-Setup.msi` (без прав администратора), портативный `TsOverlay.exe`
 или самодостаточный zip. Для лёгкой версии нужен [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/8.0).
 
 ## Что умеет
@@ -41,13 +41,13 @@
 
 ## Установка
 
-**Установщик (рекомендуется).** Запустите `TsOverlay-1.1.7-Setup.msi` — установка идёт
+**Установщик (рекомендуется).** Запустите `TsOverlay-1.1.8-Setup.msi` — установка идёт
 в `%LOCALAPPDATA%\Programs\TSOverlay` без прав администратора, создаются ярлыки с иконкой
 в меню «Пуск» и на рабочем столе, приложение появляется в «Установленные приложения».
 Удаление — оттуда же.
 
 **Портативно.** `TsOverlay.exe` (нужен .NET 8 Desktop Runtime) или распакованный
-`TsOverlay-1.1.7-win-x64-standalone.zip` — просто запустить, ничего не устанавливается.
+`TsOverlay-1.1.8-win-x64-standalone.zip` — просто запустить, ничего не устанавливается.
 
 Файлы не подписаны, поэтому SmartScreen может предупредить: «Подробнее» → «Выполнить всё равно».
 
@@ -111,7 +111,7 @@ dotnet publish .\src\TsOverlay\TsOverlay.csproj -c Release -r win-x64 --self-con
 ```powershell
 dotnet tool install --global wix --version 5.0.2
 wix build .\installer\TsOverlay.wxs -d SourceDir="$PWD\dist" -d IconPath="$PWD\src\TsOverlay\app.ico" `
-  -o .\dist\TsOverlay-1.1.7-Setup.msi -arch x64
+  -o .\dist\TsOverlay-1.1.8-Setup.msi -arch x64
 ```
 
 ## Первый запуск
@@ -175,6 +175,7 @@ src/TsOverlay/
 ## Лицензия
 
 MIT — см. [LICENSE](LICENSE).
+
 
 
 

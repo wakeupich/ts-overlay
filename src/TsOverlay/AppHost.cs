@@ -101,7 +101,7 @@ public sealed class AppHost
         if (Config.AlwaysShowOverlay && Config.OverlayEnabled)
         {
             _viewModel.Apply(TsSnapshot.Empty, Config);
-            if (AnyGameRunning())
+            if (ShouldShowAlways())
             {
                 ShowPreview(Config);
             }
@@ -203,7 +203,7 @@ public sealed class AppHost
             }
             else if (Config.AlwaysShowOverlay)
             {
-                if (AnyGameRunning())
+                if (ShouldShowAlways())
                 {
                     ShowPreview(Config);
                 }
@@ -252,7 +252,7 @@ public sealed class AppHost
             if (Config.AlwaysShowOverlay)
             {
                 // Висим поверх любых окон, но только пока запущена игра из списка.
-                if (AnyGameRunning())
+                if (ShouldShowAlways())
                 {
                     ShowPreview(Config);
                 }
@@ -416,7 +416,26 @@ public sealed class AppHost
         return false;
     }
 
-    /// <summary>Режим «поверх любых окон»: держим оверлей на экране, только пока игра запущена.</summary>
+    /// <summary>Есть ли в настройках хотя бы одна включённая игра.</summary>
+    private bool HasConfiguredGames()
+    {
+        foreach (var game in Config.Games)
+        {
+            if (game.Enabled && !string.IsNullOrWhiteSpace(Path.GetFileNameWithoutExtension(game.Exe)))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>Показывать ли оверлей в режиме «поверх любых окон»:
+    /// если список игр пуст — всегда; иначе только пока запущена игра из списка.</summary>
+    private bool ShouldShowAlways() => !HasConfiguredGames() || AnyGameRunning();
+
+    /// <summary>Режим «поверх любых окон»: держим оверлей на экране, пока игра запущена
+    /// (или всегда, если список игр пуст).</summary>
     private void EnsureAlwaysShowState()
     {
         if (_overlay == null || !Config.OverlayEnabled || !Config.AlwaysShowOverlay || _settingsOpen)
@@ -424,7 +443,7 @@ public sealed class AppHost
             return;
         }
 
-        if (AnyGameRunning())
+        if (ShouldShowAlways())
         {
             if (!_overlay.IsShown)
             {
@@ -733,7 +752,7 @@ public sealed class AppHost
         }
         else if (Config.AlwaysShowOverlay)
         {
-            if (AnyGameRunning())
+            if (ShouldShowAlways())
             {
                 ShowPreview(Config);
             }
@@ -847,3 +866,4 @@ public sealed class AppHost
         }
     }
 }
+
