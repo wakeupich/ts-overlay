@@ -29,7 +29,7 @@ public sealed class TrayService : IDisposable
         };
         _toggleItem = new WinForms.ToolStripMenuItem("Показать/скрыть оверлей", null, (_, _) => ToggleOverlayRequested?.Invoke());
         _hudItem = new WinForms.ToolStripMenuItem("Кто говорит (поверх любого окна)", null, (_, _) => TalkingHudRequested?.Invoke());
-        _alwaysItem = new WinForms.ToolStripMenuItem("Поверх любых окон (всегда)", null, (_, _) => AlwaysShowChanged?.Invoke(!_alwaysItem!.Checked))
+        _alwaysItem = new WinForms.ToolStripMenuItem("Поверх любых окон (пока игра запущена)", null, (_, _) => AlwaysShowChanged?.Invoke(!_alwaysItem!.Checked))
         {
             CheckOnClick = false,
         };
@@ -184,3 +184,4 @@ public sealed class TrayService : IDisposable
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool DestroyIcon(IntPtr handle);
 }
+

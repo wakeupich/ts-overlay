@@ -24,6 +24,7 @@ public sealed class AppHost
     private HotkeyService? _hotkeys;
     private System.Windows.Threading.DispatcherTimer? _hudTimer;
     private System.Windows.Threading.DispatcherTimer? _modifierTimer;
+    private System.Windows.Threading.DispatcherTimer? _alwaysTimer;
 
     private GameWindowInfo? _lastGame;
     private bool _preview;
@@ -85,6 +86,10 @@ public sealed class AppHost
         _modifierTimer.Tick += (_, _) => UpdateOverlayInteractive();
         _modifierTimer.Start();
 
+        _alwaysTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
+        _alwaysTimer.Tick += (_, _) => EnsureAlwaysShowState();
+        _alwaysTimer.Start();
+
         if (Config.AutoLaunchTeamSpeak && !IsTeamSpeakRunning())
         {
             LaunchTeamSpeak();
@@ -96,7 +101,10 @@ public sealed class AppHost
         if (Config.AlwaysShowOverlay && Config.OverlayEnabled)
         {
             _viewModel.Apply(TsSnapshot.Empty, Config);
-            ShowPreview(Config);
+            if (AnyGameRunning())
+            {
+                ShowPreview(Config);
+            }
         }
 
         if (Config.CheckUpdatesOnStart)
@@ -195,7 +203,14 @@ public sealed class AppHost
             }
             else if (Config.AlwaysShowOverlay)
             {
-                ShowPreview(Config);
+                if (AnyGameRunning())
+                {
+                    ShowPreview(Config);
+                }
+                else
+                {
+                    _overlay?.HideOverlay();
+                }
             }
             else if (_preview)
             {
@@ -236,7 +251,16 @@ public sealed class AppHost
 
             if (Config.AlwaysShowOverlay)
             {
-                // Оверлей всегда на экране, смена активного окна ничего не меняет.
+                // Висим поверх любых окон, но только пока запущена игра из списка.
+                if (AnyGameRunning())
+                {
+                    ShowPreview(Config);
+                }
+                else
+                {
+                    _overlay?.HideOverlay();
+                }
+
                 return;
             }
 
@@ -358,6 +382,59 @@ public sealed class AppHost
         _tray?.SetAlwaysShowChecked(enabled);
         ApplyConfig(restartMonitor: false);
         Log.Info("Оверлей поверх любых окон: " + (enabled ? "включён" : "выключен"));
+    }
+
+    /// <summary>Запущен ли хотя бы один процесс из списка игр (не обязательно в фокусе).</summary>
+    private bool AnyGameRunning()
+    {
+        foreach (var game in Config.Games)
+        {
+            if (!game.Enabled)
+            {
+                continue;
+            }
+
+            var name = Path.GetFileNameWithoutExtension(game.Exe);
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                continue;
+            }
+
+            try
+            {
+                if (Process.GetProcessesByName(name).Length > 0)
+                {
+                    return true;
+                }
+            }
+            catch
+            {
+                // процесс мог завершиться между вызовом и проверкой — не страшно
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>Режим «поверх любых окон»: держим оверлей на экране, только пока игра запущена.</summary>
+    private void EnsureAlwaysShowState()
+    {
+        if (_overlay == null || !Config.OverlayEnabled || !Config.AlwaysShowOverlay || _settingsOpen)
+        {
+            return;
+        }
+
+        if (AnyGameRunning())
+        {
+            if (!_overlay.IsShown)
+            {
+                ShowPreview(Config);
+            }
+        }
+        else if (!_pinned && !_hudVisible)
+        {
+            _overlay.HideOverlay();
+        }
     }
 
     private void UpdateOverlayInteractive()
@@ -656,7 +733,14 @@ public sealed class AppHost
         }
         else if (Config.AlwaysShowOverlay)
         {
-            ShowPreview(Config);
+            if (AnyGameRunning())
+            {
+                ShowPreview(Config);
+            }
+            else
+            {
+                _overlay?.HideOverlay();
+            }
         }
         else if (_preview)
         {
