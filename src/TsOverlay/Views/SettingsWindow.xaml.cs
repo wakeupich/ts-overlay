@@ -69,7 +69,8 @@ public partial class SettingsWindow : Window
         ScaleBox.Text = o.Scale.ToString("0.##", CultureInfo.InvariantCulture);
         RowHeightBox.Text = o.RowHeight.ToString("0.##", CultureInfo.InvariantCulture);
         FontSizeBox.Text = o.FontSize.ToString("0.##", CultureInfo.InvariantCulture);
-        OpacityBox.Text = o.Opacity.ToString("0.##", CultureInfo.InvariantCulture);
+        OpacitySlider.Value = Math.Clamp(o.Opacity, 0.2, 1.0);
+        OpacityValueText.Text = o.Opacity.ToString("P0", CultureInfo.CurrentCulture);
         MaxRowsBox.Text = o.MaxRows.ToString(CultureInfo.InvariantCulture);
         CornerRadiusBox.Text = o.CornerRadius.ToString("0.##", CultureInfo.InvariantCulture);
         ShowHeaderBox.IsChecked = o.ShowHeader;
@@ -171,7 +172,7 @@ public partial class SettingsWindow : Window
         o.Scale = Clamp(DoubleValue(ScaleBox, o.Scale), 0.5, 3.0);
         o.RowHeight = Clamp(DoubleValue(RowHeightBox, o.RowHeight), 16, 60);
         o.FontSize = Clamp(DoubleValue(FontSizeBox, o.FontSize), 8, 36);
-        o.Opacity = Clamp(DoubleValue(OpacityBox, o.Opacity), 0.2, 1.0);
+        o.Opacity = Clamp(OpacitySlider.Value, 0.2, 1.0);
         o.MaxRows = Clamp(IntValue(MaxRowsBox, o.MaxRows), 1, 64);
         o.CornerRadius = Clamp(DoubleValue(CornerRadiusBox, o.CornerRadius), 0, 40);
         o.ShowHeader = ShowHeaderBox.IsChecked == true;
@@ -197,6 +198,20 @@ public partial class SettingsWindow : Window
             Exe = g.Exe,
             DisplayName = g.DisplayName,
         }).ToList();
+    }
+
+    private void OpacitySlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (OpacityValueText != null)
+        {
+            OpacityValueText.Text = e.NewValue.ToString("P0", CultureInfo.CurrentCulture);
+        }
+
+        if (IsLoaded)
+        {
+            ReadInto(_working);
+            _applyPreview(_working);
+        }
     }
 
     private void HotkeyBox_PreviewKeyDown(object sender, KeyEventArgs e)

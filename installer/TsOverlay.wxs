@@ -1,13 +1,17 @@
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
   <Package Name="TS Overlay"
            Manufacturer="WakeUpich"
-           Version="1.1.0"
+           Version="1.1.1"
            UpgradeCode="8f3c2b1e-7a64-4d9b-9c2e-5e1f0a6d7c31"
            Scope="perUser"
            Compressed="yes">
 
     <MajorUpgrade DowngradeErrorMessage="Установлена более новая версия TS Overlay." />
     <MediaTemplate EmbedCab="yes" />
+
+    <Icon Id="AppIcon" SourceFile="$(var.IconPath)" />
+    <Property Id="ARPPRODUCTICON" Value="AppIcon" />
+    <Property Id="ARPNOMODIFY" Value="1" />
 
     <StandardDirectory Id="LocalAppDataFolder">
       <Directory Id="ProgramsFolder" Name="Programs">
@@ -17,10 +21,12 @@
               <Shortcut Id="StartMenuShortcut"
                         Directory="ProgramMenuDir"
                         Name="TS Overlay"
+                        Icon="AppIcon"
                         WorkingDirectory="INSTALLFOLDER" />
               <Shortcut Id="DesktopShortcut"
                         Directory="DesktopFolder"
                         Name="TS Overlay"
+                        Icon="AppIcon"
                         WorkingDirectory="INSTALLFOLDER" />
             </File>
           </Component>

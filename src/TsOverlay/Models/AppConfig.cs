@@ -96,7 +96,15 @@ public sealed class OverlaySettings
 
     public int MarginX { get; set; } = 16;
     public int MarginY { get; set; } = 16;
+
+    /// <summary>Позиция после перетаскивания мышью (DIP от левого верхнего угла окна/рабочей области).</summary>
+    public int CustomOffsetX { get; set; }
+
+    public int CustomOffsetY { get; set; }
+
     public double Width { get; set; } = 320;
+
+    /// <summary>Прозрачность только фона панели (0.2–1), текст и иконки не меняются.</summary>
     public double Opacity { get; set; } = 0.95;
 
     /// <summary>Общий масштаб: шрифт, высота строки, отступы.</summary>
@@ -123,6 +131,8 @@ public sealed class OverlaySettings
         Anchor = Anchor,
         MarginX = MarginX,
         MarginY = MarginY,
+        CustomOffsetX = CustomOffsetX,
+        CustomOffsetY = CustomOffsetY,
         Width = Width,
         Opacity = Opacity,
         Scale = Scale,

@@ -43,7 +43,6 @@
             Background="{Binding PanelBackground}"
             BorderBrush="#33FFFFFF"
             BorderThickness="1"
-            Opacity="{Binding PanelOpacity}"
             Padding="10">
         <Grid>
             <Grid.RowDefinitions>

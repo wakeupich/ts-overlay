@@ -8,9 +8,10 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>app.ico</ApplicationIcon>
     <AssemblyName>TsOverlay</AssemblyName>
     <RootNamespace>TsOverlay</RootNamespace>
-    <Version>1.1.0</Version>
+    <Version>1.1.1</Version>
     <AssemblyTitle>TS Overlay</AssemblyTitle>
     <Product>TS Overlay</Product>
     <Company>AlienNation</Company>
@@ -21,5 +22,9 @@
     <!-- WPF сам управляет DPI через манифест (PerMonitorV2); предупреждение WinForms-анализатора неактуально. -->
     <NoWarn>WFAC010</NoWarn>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Resource Include="app.ico" />
+  </ItemGroup>
 
 </Project>

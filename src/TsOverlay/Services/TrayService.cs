@@ -18,7 +18,7 @@ public sealed class TrayService : IDisposable
 
     public TrayService()
     {
-        var icon = CreateIcon(out var handle);
+        var icon = CreateAppIcon(out var handle);
         _iconHandle = handle;
 
         _statusItem = new WinForms.ToolStripMenuItem("Нет подключения") { Enabled = false };
@@ -125,6 +125,26 @@ public sealed class TrayService : IDisposable
         {
             DestroyIcon(_iconHandle);
         }
+    }
+
+    private static Drawing.Icon CreateAppIcon(out IntPtr handle)
+    {
+        try
+        {
+            var resource = System.Windows.Application.GetResourceStream(new Uri("pack://application:,,,/app.ico"));
+            if (resource != null)
+            {
+                using var stream = resource.Stream;
+                handle = IntPtr.Zero;
+                return new Drawing.Icon(stream);
+            }
+        }
+        catch
+        {
+            // ниже сгенерируем иконку вручную
+        }
+
+        return CreateIcon(out handle);
     }
 
     private static Drawing.Icon CreateIcon(out IntPtr handle)

@@ -2,6 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="TS Overlay — настройки"
+        Icon="app.ico"
         Width="780"
         Height="660"
         MinWidth="700"
@@ -163,8 +164,18 @@
                                 <TextBlock Grid.Row="2" Grid.Column="2" Text="Размер шрифта" />
                                 <TextBox x:Name="FontSizeBox" Grid.Row="2" Grid.Column="3" />
 
-                                <TextBlock Grid.Row="3" Text="Прозрачность (0.2–1)" />
-                                <TextBox x:Name="OpacityBox" Grid.Row="3" Grid.Column="1" />
+                                <TextBlock Grid.Row="3" Text="Прозрачность фона" />
+                                <Grid Grid.Row="3" Grid.Column="1" Margin="0,0,8,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <Slider x:Name="OpacitySlider" Minimum="0.2" Maximum="1" SmallChange="0.05"
+                                            LargeChange="0.1" VerticalAlignment="Center"
+                                            ValueChanged="OpacitySlider_ValueChanged" />
+                                    <TextBlock x:Name="OpacityValueText" Grid.Column="1" Width="40"
+                                               TextAlignment="Right" VerticalAlignment="Center" />
+                                </Grid>
 
                                 <TextBlock Grid.Row="3" Grid.Column="2" Text="Максимум строк" />
                                 <TextBox x:Name="MaxRowsBox" Grid.Row="3" Grid.Column="3" />

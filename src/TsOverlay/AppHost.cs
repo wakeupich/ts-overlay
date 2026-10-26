@@ -23,11 +23,14 @@ public sealed class AppHost
     private SettingsWindow? _settings;
     private HotkeyService? _hotkeys;
     private System.Windows.Threading.DispatcherTimer? _hudTimer;
+    private System.Windows.Threading.DispatcherTimer? _modifierTimer;
 
     private GameWindowInfo? _lastGame;
     private bool _preview;
     private bool _pinned;
     private bool _hudVisible;
+    private bool _settingsOpen;
+    private bool _previewBeforeSettings;
     private bool _everSawTeamSpeak;
     private bool _shuttingDown;
 
@@ -74,6 +77,11 @@ public sealed class AppHost
         _tray.SetStartupChecked(StartupService.IsEnabled());
         _tray.SetStatus(Config.OverlayEnabled ? "Подключение к TeamSpeak…" : "Оверлей выключен");
         InitHotkeys();
+
+        _overlay.Moved += OnOverlayMoved;
+        _modifierTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(120) };
+        _modifierTimer.Tick += (_, _) => UpdateOverlayInteractive();
+        _modifierTimer.Start();
 
         if (Config.AutoLaunchTeamSpeak && !IsTeamSpeakRunning())
         {
@@ -161,6 +169,18 @@ public sealed class AppHost
                 return;
             }
 
+            // Пока открыты настройки — не дёргаем оверлей, чтобы он не перескакивал.
+            if (_settingsOpen)
+            {
+                if (!_overlay!.IsShown)
+                {
+                    ShowPreview(Config);
+                }
+
+                _tray?.SetStatus(StatusLine(snapshot));
+                return;
+            }
+
             if (_hudVisible || _pinned)
             {
                 ShowOverForeground();
@@ -190,6 +210,13 @@ public sealed class AppHost
             Log.Info(info == null
                 ? "Игра: активное окно не игра"
                 : $"Игра: {info.Profile.Exe} rect=({info.Rect.Left},{info.Rect.Top},{info.Rect.Right},{info.Rect.Bottom}) dpi={info.DpiScale:0.##}");
+
+            if (_settingsOpen)
+            {
+                // В настройках оверлей всегда на виду и не прыгает.
+                return;
+            }
+
             if (!Config.OverlayEnabled)
             {
                 return;
@@ -260,13 +287,24 @@ public sealed class AppHost
             return;
         }
 
+        _settingsOpen = true;
+        _previewBeforeSettings = _preview;
+        ShowPreviewNow();
+
         _settings = new SettingsWindow(Config, StatusLine(_monitor?.Current ?? TsSnapshot.Empty), ApplyPreviewConfig, RestoreLiveConfig);
         _settings.Saved += () =>
         {
             _configService.Save();
             ApplyConfig(restartMonitor: true);
         };
-        _settings.Closed += (_, _) => _settings = null;
+        _settings.Closed += (_, _) =>
+        {
+            _settings = null;
+            _settingsOpen = false;
+            _preview = _previewBeforeSettings;
+            _tray?.SetPreviewChecked(_preview);
+            RestoreLiveConfig();
+        };
         _settings.Show();
     }
 
@@ -295,9 +333,29 @@ public sealed class AppHost
         _tray?.SetStartupChecked(enable);
     }
 
-    private void InitHotkeys()
+    private void UpdateOverlayInteractive()
     {
-        _hotkeys ??= new HotkeyService();
+        if (_overlay == null)
+        {
+            return;
+        }
+
+        var ctrl = (Native.GetAsyncKeyState(Native.VkControl) & 0x8000) != 0;
+        var alt = (Native.GetAsyncKeyState(Native.VkMenu) & 0x8000) != 0;
+        _overlay.SetInteractive(ctrl && alt && Config.OverlayEnabled);
+    }
+
+    private void OnOverlayMoved(int offsetX, int offsetY)
+    {
+        Config.Overlay.Anchor = "Custom";
+        Config.Overlay.CustomOffsetX = offsetX;
+        Config.Overlay.CustomOffsetY = offsetY;
+        _configService.Save();
+        Log.Info($"Оверлей перетащен: смещение {offsetX},{offsetY}");
+    }
+
+    private void InitHotkeys()
+    {        _hotkeys ??= new HotkeyService();
         _hotkeys.RegistrationFailed -= OnHotkeyFailed;
         _hotkeys.RegistrationFailed += OnHotkeyFailed;
         _hotkeys.UnregisterAll();
@@ -489,8 +547,8 @@ public sealed class AppHost
             Bottom = area.Bottom,
         };
 
-        var dpi = Native.GetDpiForSystem();
-        _overlay?.ShowPreview(rect, dpi > 0 ? dpi / 96.0 : 1.0, config);
+        // DPI берём у самого окна оверлея: GetDpiForSystem врёт при масштабировании монитора.
+        _overlay?.ShowPreview(rect, 0, config);
     }
 
     private void ApplyPreviewConfig(AppConfig config)
@@ -505,12 +563,7 @@ public sealed class AppHost
             return;
         }
 
-        if (_lastGame != null)
-        {
-            _overlay?.ShowOverGame(_lastGame, config);
-            return;
-        }
-
+        // Настройки всегда показывают оверлей на рабочем столе, не над игрой.
         _preview = true;
         _tray?.SetPreviewChecked(true);
         ShowPreview(config);

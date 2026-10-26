@@ -167,7 +167,7 @@ public sealed class OverlayViewModel : ObservableObject
         PanelPadding = 10 * scale;
         ShowHeader = o.ShowHeader;
         HeaderHeight = 34 * scale;
-        PanelBackground = Solid(o.Background, Color.FromArgb(217, 14, 17, 22));
+        PanelBackground = SolidWithOpacity(o.Background, o.Opacity, Color.FromArgb(230, 14, 17, 22));
         TextBrush = Solid(o.TextColor, Color.FromArgb(255, 233, 237, 242));
         DimBrush = Solid(o.DimColor, Color.FromArgb(153, 185, 194, 206));
         TalkingBrush = Solid(o.TalkingColor, Color.FromArgb(255, 74, 222, 128));
@@ -337,7 +337,7 @@ public sealed class OverlayViewModel : ObservableObject
             {
                 if (char.IsLetterOrDigit(ch) && char.ToUpper(ch) != letters[0])
                 {
-                    letters.Add(char.ToUpper(ch));
+                    letters.Add(char.ToUpper(ch, System.Globalization.CultureInfo.CurrentCulture));
                     break;
                 }
             }
@@ -411,6 +411,24 @@ public sealed class OverlayViewModel : ObservableObject
             2 or 3 or 4 => few,
             _ => many,
         };
+    }
+
+    private static Brush SolidWithOpacity(string hex, double opacity, Color fallback)
+    {
+        Color color;
+        try
+        {
+            color = (Color)ColorConverter.ConvertFromString(hex);
+        }
+        catch
+        {
+            color = fallback;
+        }
+
+        var alpha = (byte)Math.Clamp(color.A * Math.Clamp(opacity, 0.2, 1.0), 0, 255);
+        var brush = new SolidColorBrush(Color.FromArgb(alpha, color.R, color.G, color.B));
+        brush.Freeze();
+        return brush;
     }
 
     private static Brush Solid(string hex, Color fallback)
