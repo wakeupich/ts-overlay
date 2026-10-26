@@ -56,9 +56,16 @@
 
 ## Файлы
 
-| Файл | Описание |
-|---|---|
-| `TsOverlay.exe` | основной билд, нужен .NET 8 Desktop Runtime |
-| `TsOverlay-1.0.0-win-x64-standalone.zip` | самодостаточная сборка без зависимостей |
+| Файл | Размер | Описание |
+|---|---|---|
+| `TsOverlay.exe` | 300 КБ | основной билд, нужен .NET 8 Desktop Runtime |
+| `TsOverlay-1.0.0-win-x64-standalone.zip` | 60 МБ | самодостаточная сборка без зависимостей |
+| `SHA256SUMS.txt` | — | контрольные суммы |
 
-SHA-256: см. `SHA256SUMS.txt` в ассетах релиза.
+## Контрольные суммы (SHA-256)
+
+```
+200cb2066ed7f436249f7a533ac14e1a24a399c9f90a21544bde19702d170868  TsOverlay.exe
+1a0bf981414cc718d6f0f2e763394550924728172041099ed4e64216d4da35ce  TsOverlay-1.0.0-win-x64-standalone.zip
+```
+
