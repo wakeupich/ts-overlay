@@ -266,6 +266,10 @@ public sealed class OverlayViewModel : ObservableObject
 
     private void ConfigureRow(ClientRow row, TsClientState client, OverlaySettings settings)
     {
+        // «Говорит» только если реально передаёт голос: status=2 (talking while disabled)
+        // и flagTalking при выключенном микрофоне не подсвечиваем.
+        var speaking = client.Talking && !client.InputMuted;
+
         row.Nickname = client.Nickname;
         row.IsSelf = client.IsSelf;
         row.Away = client.Away;
@@ -273,10 +277,10 @@ public sealed class OverlayViewModel : ObservableObject
         row.FontSize = FontSize;
         row.MutedBrush = MutedBrush;
         row.TalkingBrush = TalkingBrush;
-        row.NicknameBrush = client.Talking ? TalkingBrush : client.Away ? DimBrush : TextBrush;
-        row.StatusBrush = client.Talking ? TalkingBrush : DimBrush;
+        row.NicknameBrush = speaking ? TalkingBrush : client.Away ? DimBrush : TextBrush;
+        row.StatusBrush = speaking ? TalkingBrush : DimBrush;
         row.MicBrush = client.InputMuted ? MutedBrush : DimBrush;
-        row.TalkingBackground = client.Talking ? Tint(TalkingBrush, 0x2E) : Brushes.Transparent;
+        row.TalkingBackground = speaking ? Tint(TalkingBrush, 0x2E) : Brushes.Transparent;
         row.ShowAvatar = settings.ShowAvatars;
         row.AvatarText = Initials(client.Nickname);
         row.AvatarBrush = AvatarBrushFor(client.AvatarHash, client.Nickname);
@@ -287,7 +291,7 @@ public sealed class OverlayViewModel : ObservableObject
         // Смена этих флагов перерисовывает иконки.
         row.MicMuted = client.InputMuted;
         row.Deafened = client.OutputMuted;
-        row.IsTalking = client.Talking;
+        row.IsTalking = speaking;
     }
 
     private static readonly Color[] AvatarPalette =

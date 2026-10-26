@@ -387,7 +387,9 @@ public sealed class Ts3ClientQuerySource : ITeamSpeakSource
             }
 
             var type = Ts3Protocol.Int(item, "client_type");
-            var inputMuted = Ts3Protocol.Bool(item, "client_input_muted") || !Ts3Protocol.Bool(item, "client_input_hardware");
+            var inputMuted = Ts3Protocol.Bool(item, "client_input_muted")
+                             || !Ts3Protocol.Bool(item, "client_input_hardware")
+                             || Ts3Protocol.Bool(item, "client_is_muted");
             clients[id] = new TsClientState
             {
                 Id = id,
@@ -398,7 +400,7 @@ public sealed class Ts3ClientQuerySource : ITeamSpeakSource
                 OutputMuted = Ts3Protocol.Bool(item, "client_output_muted") || !Ts3Protocol.Bool(item, "client_output_hardware"),
                 Away = Ts3Protocol.Bool(item, "client_away"),
                 PrioritySpeaker = Ts3Protocol.Bool(item, "client_is_priority_speaker"),
-                ChannelCommander = Ts3Protocol.Bool(item, "client_is_channel_commander") || Ts3Protocol.Bool(item, "client_is_muted"),
+                ChannelCommander = Ts3Protocol.Bool(item, "client_is_channel_commander"),
                 IsSelf = id == ownId,
                 IsQuery = type == 1,
                 ServerGroups = Ts3Protocol.Str(item, "client_servergroups"),
@@ -480,7 +482,7 @@ public sealed class Ts3ClientQuerySource : ITeamSpeakSource
                 {
                     if (_clients.TryGetValue(clid, out var client))
                     {
-                        var talking = status != 0;
+                        var talking = status == 1;
                         if (client.Talking != talking)
                         {
                             _clients[clid] = client.Copy(talking: talking);

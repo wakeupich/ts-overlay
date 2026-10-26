@@ -732,7 +732,10 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
             else if (payload.TryGetProperty("properties", out var props) && props.ValueKind == JsonValueKind.Object)
             {
                 var isSelf = clientId == _ownClientId;
-                _clients[clientId] = BuildClient(clientId, newChannel, props, isSelf);
+                var baseClient = _clients.TryGetValue(clientId, out var previous)
+                    ? previous
+                    : new TsClientState { Id = clientId, IsSelf = isSelf };
+                _clients[clientId] = ApplyProperties(baseClient, props).Copy(channelId: newChannel, isSelf: isSelf);
                 if (isSelf)
                 {
                     _ownChannelId = newChannel;
@@ -770,6 +773,7 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
             return;
         }
 
+
         lock (_stateLock)
         {
             if (!_clients.TryGetValue(clientId, out var existing))
@@ -798,7 +802,7 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
         {
             if (_clients.TryGetValue(clientId, out var client))
             {
-                var talking = status != 0;
+                var talking = status == 1;
                 if (client.Talking != talking)
                 {
                     _clients[clientId] = client.Copy(talking: talking);
@@ -925,6 +929,12 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
         if (Has(props, "inputDeactivated"))
         {
             inputMuted = (inputMuted ?? false) || Bool(props, "inputDeactivated");
+        }
+
+        // isMuted — мьют на стороне сервера (не путать с inputMuted).
+        if (Has(props, "isMuted"))
+        {
+            inputMuted = (inputMuted ?? false) || Bool(props, "isMuted");
         }
 
         bool? outputMuted = null;
@@ -1087,3 +1097,4 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
 
     private static string Truncate(string value, int max) => value.Length <= max ? value : value[..max] + "…";
 }
+
