@@ -103,7 +103,7 @@ src/TsOverlay/
     Ts6RemoteAppSource.cs   — провайдер TeamSpeak 6/5 (WebSocket Remote Apps)
     TeamSpeakMonitor.cs     — определяет запущенный клиент, держит подключение
     GameWatcher.cs          — активное окно игры, DPI, прямоугольник
-    Overlay placement       — в Views/OverlayWindow
+    Native.cs               — Win32-интероп: окна, DPI, прозрачность, topmost
     ConfigService.cs        — JSON-конфиг + DPAPI
     TrayService.cs          — иконка и меню в трее
     Probe.cs                — диагностический режим
