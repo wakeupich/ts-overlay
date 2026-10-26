@@ -44,6 +44,7 @@ public sealed class Ts3ClientQuerySource : ITeamSpeakSource
     private int _ownChannelId;
     private int _selectedHandlerId = -1;
     private string _serverName = "";
+    private readonly Dictionary<int, string> _groupNames = new();
     private volatile bool _needsRefresh = true;
     private DateTime _lastFullRefresh = DateTime.MinValue;
     private volatile bool _authFailed;
@@ -202,6 +203,9 @@ public sealed class Ts3ClientQuerySource : ITeamSpeakSource
         }
 
         await CommandAsync("clientnotifyregister schandlerid=0 event=any");
+        // Список серверных групп приходит событием, поэтому подписываемся и просим его.
+        await CommandAsync("clientnotifyregister schandlerid=0 event=notifyservergrouplist");
+        await CommandAsync("servergrouplist");
         Log.Info("TS3: ClientQuery подключён");
     }
 
@@ -373,6 +377,7 @@ public sealed class Ts3ClientQuerySource : ITeamSpeakSource
         }
 
         var clients = new Dictionary<int, TsClientState>();
+
         foreach (var item in Ts3Protocol.ParseResponse(clientsResponse.Response).Items)
         {
             var id = Ts3Protocol.Int(item, "clid");
@@ -396,7 +401,18 @@ public sealed class Ts3ClientQuerySource : ITeamSpeakSource
                 ChannelCommander = Ts3Protocol.Bool(item, "client_is_channel_commander") || Ts3Protocol.Bool(item, "client_is_muted"),
                 IsSelf = id == ownId,
                 IsQuery = type == 1,
+                ServerGroups = Ts3Protocol.Str(item, "client_servergroups"),
             };
+        }
+
+        // Аватары читаем отдельным пакетным запросом: clientlist их не отдаёт.
+        var avatars = await ReadAvatarsAsync(clients.Keys);
+        foreach (var pair in avatars)
+        {
+            if (clients.TryGetValue(pair.Key, out var client))
+            {
+                clients[pair.Key] = client.Copy(avatarHash: pair.Value);
+            }
         }
 
         lock (_stateLock)
@@ -420,6 +436,31 @@ public sealed class Ts3ClientQuerySource : ITeamSpeakSource
         _lastFullRefresh = DateTime.UtcNow;
         _status = "TeamSpeak 3: подключено";
         Publish(null);
+    }
+
+    /// <summary>Аватар — хэш, который отдаёт clientvariable; читаем пакетом по 40 клиентов.</summary>
+    private async Task<Dictionary<int, string>> ReadAvatarsAsync(IEnumerable<int> clientIds)
+    {
+        var result = new Dictionary<int, string>();
+        var ids = clientIds.Where(id => id > 0).ToList();
+        const int batchSize = 40;
+
+        for (var offset = 0; offset < ids.Count; offset += batchSize)
+        {
+            var blocks = ids.Skip(offset).Take(batchSize).Select(id => $"clid={id} client_flag_avatar");
+            var response = await CommandAsync("clientvariable " + string.Join("|", blocks));
+            foreach (var item in Ts3Protocol.ParseResponse(response.Response).Items)
+            {
+                var id = Ts3Protocol.Int(item, "clid");
+                var hash = Ts3Protocol.Str(item, "client_flag_avatar");
+                if (id > 0 && hash.Length > 0)
+                {
+                    result[id] = hash;
+                }
+            }
+        }
+
+        return result;
     }
 
     private void HandleEvent(string line)
@@ -517,6 +558,38 @@ public sealed class Ts3ClientQuerySource : ITeamSpeakSource
                 break;
             }
 
+            case "notifyservergrouplist":
+            {
+                var payload = space < 0 ? "" : line[(space + 1)..];
+                var names = new Dictionary<int, string>();
+                foreach (var part in payload.Split('|'))
+                {
+                    var group = Ts3Protocol.ParseFields(part.Trim());
+                    var sgid = Ts3Protocol.Int(group, "sgid");
+                    var groupName = Ts3Protocol.Str(group, "name");
+                    if (sgid > 0 && groupName.Length > 0)
+                    {
+                        names[sgid] = groupName;
+                    }
+                }
+
+                if (names.Count > 0)
+                {
+                    lock (_stateLock)
+                    {
+                        _groupNames.Clear();
+                        foreach (var kv in names)
+                        {
+                            _groupNames[kv.Key] = kv.Value;
+                        }
+                    }
+
+                    changed = true;
+                }
+
+                break;
+            }
+
             case "notifycliententerview":
             case "notifyconnectstatuschange":
             case "notifycurrentserverconnectionchanged":
@@ -554,6 +627,7 @@ public sealed class Ts3ClientQuerySource : ITeamSpeakSource
                 ChannelName = channelName,
                 Channels = _channels.Values.ToArray(),
                 Clients = _clients.Values.ToArray(),
+                GroupNames = new Dictionary<int, string>(_groupNames),
             };
         }
 

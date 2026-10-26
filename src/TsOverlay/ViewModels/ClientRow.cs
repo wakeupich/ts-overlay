@@ -1,6 +1,16 @@
+using System.Collections.ObjectModel;
 using System.Windows.Media;
 
 namespace TsOverlay.ViewModels;
+
+/// <summary>Маленький значок серверной группы рядом с ником.</summary>
+public sealed class GroupBadge
+{
+    public string Text { get; init; } = "";
+    public string Tooltip { get; init; } = "";
+    public Brush Brush { get; init; } = Brushes.SteelBlue;
+    public double FontSize { get; init; } = 9;
+}
 
 /// <summary>Строка оверлея: ник, говорит/молчит, выключен ли микрофон.</summary>
 public sealed class ClientRow : ObservableObject
@@ -19,8 +29,53 @@ public sealed class ClientRow : ObservableObject
     private Brush _talkingBrush = Brushes.LimeGreen;
     private double _rowHeight = 26;
     private double _fontSize = 14;
+    private string _avatarText = "";
+    private Brush _avatarBrush = Brushes.SteelBlue;
+    private double _avatarSize = 20;
+    private double _avatarFontSize = 9;
+    private bool _showAvatar = true;
+    private bool _showBadges = true;
 
     public int Id { get; init; }
+
+    public ObservableCollection<GroupBadge> Badges { get; } = new();
+
+    public string AvatarText
+    {
+        get => _avatarText;
+        set => Set(ref _avatarText, value);
+    }
+
+    public Brush AvatarBrush
+    {
+        get => _avatarBrush;
+        set => Set(ref _avatarBrush, value);
+    }
+
+    public double AvatarSize
+    {
+        get => _avatarSize;
+        set => Set(ref _avatarSize, value);
+    }
+
+    public double AvatarFontSize
+    {
+        get => _avatarFontSize;
+        set => Set(ref _avatarFontSize, value);
+    }
+
+    public bool ShowAvatar
+    {
+        get => _showAvatar;
+        set => Set(ref _showAvatar, value);
+    }
+
+    public bool ShowBadges
+    {
+        get => _showBadges;
+        set => Set(ref _showBadges, value);
+    }
+
 
     public string Nickname
     {

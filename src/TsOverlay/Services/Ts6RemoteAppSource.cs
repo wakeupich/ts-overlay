@@ -946,6 +946,8 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
             away: Has(props, "away") ? Bool(props, "away") : null,
             prioritySpeaker: Has(props, "isPrioritySpeaker") ? Bool(props, "isPrioritySpeaker") : null,
             channelCommander: Has(props, "isChannelCommander") ? Bool(props, "isChannelCommander") : null,
+            avatarHash: Has(props, "flagAvatar") ? Str(props, "flagAvatar") : null,
+            serverGroups: Has(props, "serverGroups") ? Str(props, "serverGroups") : null,
             isQuery: IsQueryClient(props) ? true : null);
     }
 

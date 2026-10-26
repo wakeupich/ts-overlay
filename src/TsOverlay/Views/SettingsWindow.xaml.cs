@@ -4,6 +4,7 @@ using System.Globalization;
 using System.IO;
 using System.Text.Json;
 using System.Windows;
+using System.Windows.Input;
 using Microsoft.Win32;
 using TsOverlay.Models;
 using TsOverlay.Services;
@@ -55,7 +56,10 @@ public partial class SettingsWindow : Window
         AutoLaunchBox.IsChecked = config.AutoLaunchTeamSpeak;
         ExitWithTsBox.IsChecked = config.ExitWithTeamSpeak;
         NotifyBox.IsChecked = config.NotifyOnPermissionRequest;
+        CheckUpdatesBox.IsChecked = config.CheckUpdatesOnStart;
         ShowSelfBox.IsChecked = config.ShowSelf;
+        HotkeyToggleBox.Text = config.HotkeyToggleOverlay;
+        HotkeyHudBox.Text = config.HotkeyTalkingHud;
 
         var o = config.Overlay;
         SelectTag(AnchorBox, o.Anchor);
@@ -70,6 +74,8 @@ public partial class SettingsWindow : Window
         CornerRadiusBox.Text = o.CornerRadius.ToString("0.##", CultureInfo.InvariantCulture);
         ShowHeaderBox.IsChecked = o.ShowHeader;
         ShowServerNameBox.IsChecked = o.ShowServerName;
+        ShowAvatarsBox.IsChecked = o.ShowAvatars;
+        ShowGroupBadgesBox.IsChecked = o.ShowGroupBadges;
 
         BackgroundBox.Text = o.Background;
         TextColorBox.Text = o.TextColor;
@@ -102,11 +108,28 @@ public partial class SettingsWindow : Window
     {
         ReadInto(_working);
 
+        foreach (var (name, gesture) in new[]
+                 {
+                     ("Показать/скрыть оверлей", _working.HotkeyToggleOverlay),
+                     ("Кто говорит", _working.HotkeyTalkingHud),
+                 })
+        {
+            if (gesture.Length > 0 && !HotkeyService.TryParse(gesture, out _, out _))
+            {
+                MessageBox.Show(this, $"Не удалось разобрать комбинацию «{gesture}» для «{name}». Пример: Ctrl+Alt+O.",
+                    "TS Overlay", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+        }
+
         _live.ClientMode = _working.ClientMode;
         _live.AutoLaunchTeamSpeak = _working.AutoLaunchTeamSpeak;
         _live.ExitWithTeamSpeak = _working.ExitWithTeamSpeak;
         _live.NotifyOnPermissionRequest = _working.NotifyOnPermissionRequest;
+        _live.CheckUpdatesOnStart = _working.CheckUpdatesOnStart;
         _live.ShowSelf = _working.ShowSelf;
+        _live.HotkeyToggleOverlay = _working.HotkeyToggleOverlay;
+        _live.HotkeyTalkingHud = _working.HotkeyTalkingHud;
         _live.Ts3ApiKey = _working.Ts3ApiKey.Trim();
         _live.Ts3Port = _working.Ts3Port;
         _live.Ts6Port = _working.Ts6Port;
@@ -135,7 +158,10 @@ public partial class SettingsWindow : Window
         config.AutoLaunchTeamSpeak = AutoLaunchBox.IsChecked == true;
         config.ExitWithTeamSpeak = ExitWithTsBox.IsChecked == true;
         config.NotifyOnPermissionRequest = NotifyBox.IsChecked == true;
+        config.CheckUpdatesOnStart = CheckUpdatesBox.IsChecked == true;
         config.ShowSelf = ShowSelfBox.IsChecked == true;
+        config.HotkeyToggleOverlay = HotkeyToggleBox.Text.Trim();
+        config.HotkeyTalkingHud = HotkeyHudBox.Text.Trim();
 
         var o = config.Overlay;
         o.Anchor = SelectedTag(AnchorBox, "TopLeft");
@@ -150,6 +176,8 @@ public partial class SettingsWindow : Window
         o.CornerRadius = Clamp(DoubleValue(CornerRadiusBox, o.CornerRadius), 0, 40);
         o.ShowHeader = ShowHeaderBox.IsChecked == true;
         o.ShowServerName = ShowServerNameBox.IsChecked == true;
+        o.ShowAvatars = ShowAvatarsBox.IsChecked == true;
+        o.ShowGroupBadges = ShowGroupBadgesBox.IsChecked == true;
 
         o.Background = NormalizeColor(BackgroundBox.Text, o.Background);
         o.TextColor = NormalizeColor(TextColorBox.Text, o.TextColor);
@@ -171,8 +199,31 @@ public partial class SettingsWindow : Window
         }).ToList();
     }
 
-    private void OnPreviewClick(object sender, RoutedEventArgs e)
+    private void HotkeyBox_PreviewKeyDown(object sender, KeyEventArgs e)
     {
+        e.Handled = true;
+        if (sender is not System.Windows.Controls.TextBox box)
+        {
+            return;
+        }
+
+        var key = e.Key == Key.System ? e.SystemKey : e.Key;
+        if (key is Key.LeftCtrl or Key.RightCtrl or Key.LeftAlt or Key.RightAlt
+            or Key.LeftShift or Key.RightShift or Key.LWin or Key.RWin or Key.None)
+        {
+            return;
+        }
+
+        if (key is Key.Back or Key.Delete)
+        {
+            box.Text = "";
+            return;
+        }
+
+        box.Text = HotkeyService.Format(key, Keyboard.Modifiers);
+    }
+
+    private void OnPreviewClick(object sender, RoutedEventArgs e)    {
         ReadInto(_working);
         _applyPreview(_working);
     }

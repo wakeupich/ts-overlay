@@ -136,6 +136,17 @@ public static class Probe
             if (client.OutputMuted) flags.Add("deaf");
             if (client.Away) flags.Add("away");
             if (client.PrioritySpeaker) flags.Add("priority");
+            if (client.AvatarHash.Length > 0) flags.Add("avatar:" + client.AvatarHash[..Math.Min(8, client.AvatarHash.Length)]);
+            var groups = new List<string>();
+            foreach (var raw in client.ServerGroups.Split(',', StringSplitOptions.RemoveEmptyEntries))
+            {
+                if (int.TryParse(raw.Trim(), out var gid) && snapshot.GroupNames.TryGetValue(gid, out var groupName))
+                {
+                    groups.Add(groupName);
+                }
+            }
+
+            if (groups.Count > 0) flags.Add("groups:" + string.Join("/", groups));
             if (flags.Count > 0)
             {
                 sb.Append("  [").Append(string.Join(", ", flags)).Append(']');

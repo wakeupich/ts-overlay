@@ -10,7 +10,7 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AssemblyName>TsOverlay</AssemblyName>
     <RootNamespace>TsOverlay</RootNamespace>
-    <Version>1.0.0</Version>
+    <Version>1.1.0</Version>
     <AssemblyTitle>TS Overlay</AssemblyTitle>
     <Product>TS Overlay</Product>
     <Company>AlienNation</Company>

@@ -12,6 +12,8 @@ public sealed class TrayService : IDisposable
     private readonly WinForms.ToolStripMenuItem _overlayItem;
     private readonly WinForms.ToolStripMenuItem _previewItem;
     private readonly WinForms.ToolStripMenuItem _startupItem;
+    private readonly WinForms.ToolStripMenuItem _toggleItem;
+    private readonly WinForms.ToolStripMenuItem _hudItem;
     private readonly IntPtr _iconHandle;
 
     public TrayService()
@@ -24,6 +26,8 @@ public sealed class TrayService : IDisposable
         {
             CheckOnClick = false,
         };
+        _toggleItem = new WinForms.ToolStripMenuItem("Показать/скрыть оверлей", null, (_, _) => ToggleOverlayRequested?.Invoke());
+        _hudItem = new WinForms.ToolStripMenuItem("Кто говорит (поверх любого окна)", null, (_, _) => TalkingHudRequested?.Invoke());
         _previewItem = new WinForms.ToolStripMenuItem("Показать оверлей на рабочем столе", null, (_, _) => PreviewToggled?.Invoke());
         _startupItem = new WinForms.ToolStripMenuItem("Запускать с Windows", null, (_, _) => StartupChanged?.Invoke(!_startupItem!.Checked));
 
@@ -31,11 +35,14 @@ public sealed class TrayService : IDisposable
         menu.Items.Add(_statusItem);
         menu.Items.Add(new WinForms.ToolStripSeparator());
         menu.Items.Add(_overlayItem);
+        menu.Items.Add(_toggleItem);
+        menu.Items.Add(_hudItem);
         menu.Items.Add(_previewItem);
         menu.Items.Add(new WinForms.ToolStripMenuItem("Настройки…", null, (_, _) => SettingsRequested?.Invoke()));
         menu.Items.Add(new WinForms.ToolStripSeparator());
         menu.Items.Add(new WinForms.ToolStripMenuItem("Запустить TeamSpeak", null, (_, _) => LaunchTeamSpeakRequested?.Invoke()));
         menu.Items.Add(new WinForms.ToolStripMenuItem("Переподключиться", null, (_, _) => RestartRequested?.Invoke()));
+        menu.Items.Add(new WinForms.ToolStripMenuItem("Проверить обновления", null, (_, _) => CheckUpdatesRequested?.Invoke()));
         menu.Items.Add(new WinForms.ToolStripSeparator());
         menu.Items.Add(_startupItem);
         menu.Items.Add(new WinForms.ToolStripSeparator());
@@ -57,11 +64,17 @@ public sealed class TrayService : IDisposable
 
     public event Action? PreviewToggled;
 
+    public event Action? ToggleOverlayRequested;
+
+    public event Action? TalkingHudRequested;
+
     public event Action<bool>? StartupChanged;
 
     public event Action? RestartRequested;
 
     public event Action? LaunchTeamSpeakRequested;
+
+    public event Action? CheckUpdatesRequested;
 
     public event Action? ExitRequested;
 
@@ -74,6 +87,12 @@ public sealed class TrayService : IDisposable
     }
 
     public void SetOverlayChecked(bool value) => _overlayItem.Checked = value;
+
+    public void SetHotkeys(string toggle, string hud)
+    {
+        _toggleItem.Text = string.IsNullOrWhiteSpace(toggle) ? "Показать/скрыть оверлей" : $"Показать/скрыть оверлей ({toggle})";
+        _hudItem.Text = string.IsNullOrWhiteSpace(hud) ? "Кто говорит (поверх любого окна)" : $"Кто говорит ({hud})";
+    }
 
     public void SetPreviewChecked(bool value) => _previewItem.Checked = value;
 

@@ -93,23 +93,44 @@
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
                                     <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
 
-                                <Ellipse Grid.Column="0"
+                                <!-- Аватар: инициалы, цвет стабилен для клиента -->
+                                <Border Grid.Column="0"
+                                        Width="{Binding AvatarSize}"
+                                        Height="{Binding AvatarSize}"
+                                        CornerRadius="11"
+                                        Background="{Binding AvatarBrush}"
+                                        Margin="0,0,6,0"
+                                        VerticalAlignment="Center"
+                                        Visibility="{Binding ShowAvatar, Converter={StaticResource BoolToVis}}">
+                                    <TextBlock Text="{Binding AvatarText}"
+                                               FontFamily="Segoe UI"
+                                               FontSize="{Binding AvatarFontSize}"
+                                               FontWeight="SemiBold"
+                                               Foreground="White"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center" />
+                                </Border>
+
+                                <Ellipse Grid.Column="1"
                                          Width="6"
                                          Height="6"
                                          Margin="0,0,7,0"
                                          VerticalAlignment="Center"
                                          Fill="{Binding StatusBrush}" />
 
-                                <TextBlock Grid.Column="1"
+                                <TextBlock Grid.Column="2"
                                            Text="{Binding Nickname}"
                                            FontFamily="Segoe UI"
                                            FontSize="{Binding FontSize}"
                                            Foreground="{Binding NicknameBrush}"
                                            TextTrimming="CharacterEllipsis"
+                                           ClipToBounds="True"
                                            VerticalAlignment="Center">
                                     <TextBlock.Style>
                                         <Style TargetType="TextBlock">
@@ -122,7 +143,37 @@
                                     </TextBlock.Style>
                                 </TextBlock>
 
-                                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                <!-- Значки серверных групп (TS3) -->
+                                <ItemsControl Grid.Column="3"
+                                              ItemsSource="{Binding Badges}"
+                                              Visibility="{Binding ShowBadges, Converter={StaticResource BoolToVis}}"
+                                              VerticalAlignment="Center"
+                                              MaxWidth="130"
+                                              Margin="4,0,0,0">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <StackPanel Orientation="Horizontal" />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Background="{Binding Brush}"
+                                                    CornerRadius="4"
+                                                    Padding="4,0"
+                                                    Margin="0,0,3,0"
+                                                    MaxWidth="90"
+                                                    ToolTip="{Binding Tooltip}">
+                                                <TextBlock Text="{Binding Text}"
+                                                           FontFamily="Segoe UI"
+                                                           FontSize="{Binding FontSize}"
+                                                           Foreground="White"
+                                                           TextTrimming="CharacterEllipsis" />
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+
+                                <StackPanel Grid.Column="4" Orientation="Horizontal" VerticalAlignment="Center">
                                     <!-- Микрофон выключен -->
                                     <Viewbox Style="{StaticResource MuteIcon}"
                                              Visibility="{Binding MicMuted, Converter={StaticResource BoolToVis}}">

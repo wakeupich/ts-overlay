@@ -43,6 +43,16 @@ public partial class App : Application
         {
             _host.ShowSettings();
         }
+
+        if (e.Args.Any(a => a.Equals("--preview", StringComparison.OrdinalIgnoreCase)))
+        {
+            _host.ShowPreviewNow();
+        }
+
+        if (e.Args.Any(a => a.Equals("--hud", StringComparison.OrdinalIgnoreCase)))
+        {
+            _host.ShowHudNow();
+        }
     }
 
     protected override void OnExit(ExitEventArgs e)

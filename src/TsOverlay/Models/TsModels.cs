@@ -22,6 +22,9 @@ public sealed class TsSnapshot
     public IReadOnlyList<TsChannelState> Channels { get; init; } = Array.Empty<TsChannelState>();
     public IReadOnlyList<TsClientState> Clients { get; init; } = Array.Empty<TsClientState>();
 
+    /// <summary>Имена серверных групп: sgid → название (TS3).</summary>
+    public IReadOnlyDictionary<int, string> GroupNames { get; init; } = new Dictionary<int, string>();
+
     public int CountInCurrentChannel
     {
         get
@@ -54,6 +57,12 @@ public sealed class TsClientState
     public bool IsSelf { get; init; }
     public bool IsQuery { get; init; }
 
+    /// <summary>Хэш аватара (MD5) — одинаковый в TS3 и TS6.</summary>
+    public string AvatarHash { get; init; } = "";
+
+    /// <summary>ID серверных групп через запятую, как отдаёт клиент.</summary>
+    public string ServerGroups { get; init; } = "";
+
     /// <summary>Копия с изменёнными полями (состояние неизменяемое, чтобы не ловить гонки потоков).</summary>
     public TsClientState Copy(
         int? channelId = null,
@@ -65,7 +74,9 @@ public sealed class TsClientState
         bool? prioritySpeaker = null,
         bool? channelCommander = null,
         bool? isSelf = null,
-        bool? isQuery = null)
+        bool? isQuery = null,
+        string? avatarHash = null,
+        string? serverGroups = null)
         => new()
         {
             Id = Id,
@@ -79,6 +90,8 @@ public sealed class TsClientState
             ChannelCommander = channelCommander ?? ChannelCommander,
             IsSelf = isSelf ?? IsSelf,
             IsQuery = isQuery ?? IsQuery,
+            AvatarHash = avatarHash ?? AvatarHash,
+            ServerGroups = serverGroups ?? ServerGroups,
         };
 }
 

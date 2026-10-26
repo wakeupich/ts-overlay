@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.IO;
+using System.Net.Http;
 using System.Windows;
 using TsOverlay.Models;
 using TsOverlay.Services;
@@ -20,9 +21,13 @@ public sealed class AppHost
     private OverlayWindow? _overlay;
     private TrayService? _tray;
     private SettingsWindow? _settings;
+    private HotkeyService? _hotkeys;
+    private System.Windows.Threading.DispatcherTimer? _hudTimer;
 
     private GameWindowInfo? _lastGame;
     private bool _preview;
+    private bool _pinned;
+    private bool _hudVisible;
     private bool _everSawTeamSpeak;
     private bool _shuttingDown;
 
@@ -41,9 +46,12 @@ public sealed class AppHost
         _tray.SettingsRequested += OpenSettings;
         _tray.OverlayEnabledChanged += SetOverlayEnabled;
         _tray.PreviewToggled += TogglePreview;
+        _tray.ToggleOverlayRequested += TogglePinnedOverlay;
+        _tray.TalkingHudRequested += ShowTalkingHud;
         _tray.StartupChanged += ToggleStartup;
         _tray.RestartRequested += () => _ = _monitor?.RestartAsync();
         _tray.LaunchTeamSpeakRequested += LaunchTeamSpeak;
+        _tray.CheckUpdatesRequested += () => _ = CheckUpdatesAsync(silent: false);
         _tray.ExitRequested += () => Application.Current.Shutdown();
 
         _monitor = new TeamSpeakMonitor(() => Config, Application.Current.Dispatcher);
@@ -65,6 +73,7 @@ public sealed class AppHost
         _tray.SetOverlayChecked(Config.OverlayEnabled);
         _tray.SetStartupChecked(StartupService.IsEnabled());
         _tray.SetStatus(Config.OverlayEnabled ? "Подключение к TeamSpeak…" : "Оверлей выключен");
+        InitHotkeys();
 
         if (Config.AutoLaunchTeamSpeak && !IsTeamSpeakRunning())
         {
@@ -73,6 +82,17 @@ public sealed class AppHost
 
         _monitor.Start();
         Log.Info("TS Overlay запущен");
+
+        if (Config.CheckUpdatesOnStart)
+        {
+            var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(8) };
+            timer.Tick += (_, _) =>
+            {
+                timer.Stop();
+                _ = CheckUpdatesAsync(silent: true);
+            };
+            timer.Start();
+        }
 
         if (firstRun)
         {
@@ -84,6 +104,14 @@ public sealed class AppHost
     public void Shutdown()
     {
         _shuttingDown = true;
+        try
+        {
+            _hotkeys?.Dispose();
+        }
+        catch
+        {
+        }
+
         try
         {
             _gameWatcher?.Stop();
@@ -133,7 +161,11 @@ public sealed class AppHost
                 return;
             }
 
-            if (_preview)
+            if (_hudVisible || _pinned)
+            {
+                ShowOverForeground();
+            }
+            else if (_preview)
             {
                 ShowPreview(Config);
             }
@@ -163,9 +195,15 @@ public sealed class AppHost
                 return;
             }
 
+            if (_pinned)
+            {
+                // Оверлей закреплён горячей клавишей — не реагируем на смену игр.
+                return;
+            }
+
             if (info == null)
             {
-                if (!_preview)
+                if (!_preview && !_hudVisible)
                 {
                     _overlay?.HideOverlay();
                 }
@@ -232,6 +270,15 @@ public sealed class AppHost
         _settings.Show();
     }
 
+    /// <summary>Показать оверлей на рабочем столе (флаг --preview и кнопка в настройках).</summary>
+    public void ShowPreviewNow()
+    {
+        _preview = true;
+        _tray?.SetPreviewChecked(true);
+        _viewModel.Apply(_monitor?.Current ?? TsSnapshot.Empty, Config);
+        ShowPreview(Config);
+    }
+
     private void SetOverlayEnabled(bool enabled)
     {
         Config.OverlayEnabled = enabled;
@@ -246,6 +293,164 @@ public sealed class AppHost
         Config.StartWithWindows = enable;
         _configService.Save();
         _tray?.SetStartupChecked(enable);
+    }
+
+    private void InitHotkeys()
+    {
+        _hotkeys ??= new HotkeyService();
+        _hotkeys.RegistrationFailed -= OnHotkeyFailed;
+        _hotkeys.RegistrationFailed += OnHotkeyFailed;
+        _hotkeys.UnregisterAll();
+
+        if (!string.IsNullOrWhiteSpace(Config.HotkeyToggleOverlay))
+        {
+            _hotkeys.Register(Config.HotkeyToggleOverlay, TogglePinnedOverlay);
+        }
+
+        if (!string.IsNullOrWhiteSpace(Config.HotkeyTalkingHud))
+        {
+            _hotkeys.Register(Config.HotkeyTalkingHud, ShowTalkingHud);
+        }
+
+        _tray?.SetHotkeys(Config.HotkeyToggleOverlay, Config.HotkeyTalkingHud);
+        Log.Info($"Горячие клавиши: оверлей «{Config.HotkeyToggleOverlay}», кто говорит «{Config.HotkeyTalkingHud}»");
+    }
+
+    private void OnHotkeyFailed(string gesture)
+    {
+        Log.Info("Горячая клавиша занята: " + gesture);
+        _tray?.ShowBalloon($"Не удалось назначить {gesture}: комбинация занята другой программой.", error: true);
+    }
+
+    /// <summary>Проверка обновлений на GitHub Releases.</summary>
+    private async Task CheckUpdatesAsync(bool silent)
+    {
+        var info = await new UpdateService().CheckAsync();
+        if (info == null)
+        {
+            if (!silent)
+            {
+                _tray?.ShowBalloon("Не удалось проверить обновления. Для приватного репозитория проверка недоступна.", error: true);
+            }
+
+            return;
+        }
+
+        if (info.Version > UpdateService.CurrentVersion)
+        {
+            var text = $"Доступна версия {info.Tag} (у вас {UpdateService.CurrentVersion.ToString(3)}).\n\n" +
+                       (info.MsiUrl != null
+                           ? "Скачать и установить сейчас? Оверлей закроется, установщик обновит файлы."
+                           : "Открыть страницу релиза для скачивания?");
+
+            var result = MessageBox.Show(text, "TS Overlay", MessageBoxButton.YesNo, MessageBoxImage.Information);
+            if (result != MessageBoxResult.Yes)
+            {
+                return;
+            }
+
+            if (info.MsiUrl != null)
+            {
+                await DownloadAndRunInstallerAsync(info.MsiUrl, info.Version);
+            }
+            else
+            {
+                Process.Start(new ProcessStartInfo(info.PageUrl) { UseShellExecute = true });
+            }
+
+            return;
+        }
+
+        if (!silent)
+        {
+            _tray?.ShowBalloon($"У вас последняя версия ({UpdateService.CurrentVersion.ToString(3)}).");
+        }
+    }
+
+    private async Task DownloadAndRunInstallerAsync(string url, Version version)
+    {
+        try
+        {
+            var path = Path.Combine(Path.GetTempPath(), $"TsOverlay-{version}-Setup.msi");
+            using var http = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
+            var bytes = await http.GetByteArrayAsync(url);
+            await File.WriteAllBytesAsync(path, bytes);
+            Process.Start(new ProcessStartInfo("msiexec.exe", $"/i \"{path}\" /qb") { UseShellExecute = true });
+            Application.Current.Shutdown();
+        }
+        catch (Exception ex)
+        {
+            Log.Error("Не удалось скачать обновление", ex);
+            _tray?.ShowBalloon("Не удалось скачать обновление: " + ex.Message, error: true);
+        }
+    }
+
+    private void TogglePinnedOverlay()
+    {
+        if (_pinned)
+        {
+            _pinned = false;
+            _overlay?.HideOverlay();
+            return;
+        }
+
+        _pinned = true;
+        ShowOverForeground();
+    }
+
+    /// <summary>Глобальная клавиша: показать «кто говорит» на несколько секунд поверх любого окна.</summary>
+    private void ShowTalkingHud()
+    {
+        ShowOverForeground();
+        _hudVisible = true;
+
+        if (_hudTimer == null)
+        {
+            _hudTimer = new System.Windows.Threading.DispatcherTimer
+            {
+                Interval = TimeSpan.FromSeconds(6),
+            };
+            _hudTimer.Tick += (_, _) =>
+            {
+                _hudTimer!.Stop();
+                _hudVisible = false;
+                if (!_pinned && _lastGame == null)
+                {
+                    _overlay?.HideOverlay();
+                }
+            };
+        }
+
+        _hudTimer.Stop();
+        _hudTimer.Start();
+    }
+
+    /// <summary>Показать HUD по флагу --hud (тест/диагностика).</summary>
+    public void ShowHudNow() => ShowTalkingHud();
+
+    private void ShowOverForeground()
+    {
+        if (!Config.OverlayEnabled)
+        {
+            return;
+        }
+
+        var hwnd = Native.GetForegroundWindow();
+        if (hwnd == IntPtr.Zero || !Native.GetWindowRect(hwnd, out var rect) || rect.Width < 80)
+        {
+            return;
+        }
+
+        Native.GetWindowThreadProcessId(hwnd, out var pid);
+        if (pid == (uint)Environment.ProcessId)
+        {
+            return;
+        }
+
+        var dpi = Native.GetDpiForWindow(hwnd);
+        Log.Info($"HUD: окно pid={pid} rect=({rect.Left},{rect.Top},{rect.Right},{rect.Bottom}) dpi={dpi}");
+        _viewModel.Apply(_monitor?.Current ?? TsSnapshot.Empty, Config);
+        _overlay?.ShowPreview(rect, dpi > 0 ? dpi / 96.0 : 1.0, Config);
     }
 
     private void TogglePreview()
@@ -339,6 +544,7 @@ public sealed class AppHost
         _tray?.SetStartupChecked(StartupService.IsEnabled());
         _gameWatcher?.SetGames(Config.Games);
         _gameWatcher?.SetEnabled(Config.OverlayEnabled);
+        InitHotkeys();
 
         _viewModel.Apply(_monitor?.Current ?? TsSnapshot.Empty, Config);
         _overlay?.Configure(Config);

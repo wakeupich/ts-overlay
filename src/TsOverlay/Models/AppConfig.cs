@@ -21,6 +21,13 @@ public sealed class AppConfig
     public bool ShowSelf { get; set; } = true;
     public bool NotifyOnPermissionRequest { get; set; } = true;
 
+    /// <summary>Глобальные горячие клавиши, например "Ctrl+Alt+O".</summary>
+    public string HotkeyToggleOverlay { get; set; } = "Ctrl+Alt+O";
+
+    public string HotkeyTalkingHud { get; set; } = "Ctrl+Alt+H";
+
+    public bool CheckUpdatesOnStart { get; set; } = true;
+
     public OverlaySettings Overlay { get; set; } = new();
     public List<GameProfile> Games { get; set; } = new();
 
@@ -89,7 +96,7 @@ public sealed class OverlaySettings
 
     public int MarginX { get; set; } = 16;
     public int MarginY { get; set; } = 16;
-    public double Width { get; set; } = 280;
+    public double Width { get; set; } = 320;
     public double Opacity { get; set; } = 0.95;
 
     /// <summary>Общий масштаб: шрифт, высота строки, отступы.</summary>
@@ -102,6 +109,8 @@ public sealed class OverlaySettings
 
     public bool ShowHeader { get; set; } = true;
     public bool ShowServerName { get; set; } = true;
+    public bool ShowAvatars { get; set; } = true;
+    public bool ShowGroupBadges { get; set; } = true;
 
     public string Background { get; set; } = "#E60E1116";
     public string TextColor { get; set; } = "#FFE9EDF2";
@@ -123,6 +132,8 @@ public sealed class OverlaySettings
         CornerRadius = CornerRadius,
         ShowHeader = ShowHeader,
         ShowServerName = ShowServerName,
+        ShowAvatars = ShowAvatars,
+        ShowGroupBadges = ShowGroupBadges,
         Background = Background,
         TextColor = TextColor,
         DimColor = DimColor,

@@ -63,6 +63,34 @@
                                 <CheckBox x:Name="AutoLaunchBox" Content="Запускать клиент TeamSpeak вместе с оверлеем" Margin="0,2" />
                                 <CheckBox x:Name="ExitWithTsBox" Content="Закрывать оверлей при выходе из TeamSpeak" Margin="0,2" />
                                 <CheckBox x:Name="NotifyBox" Content="Показывать уведомления (например, запрос доступа TS6)" Margin="0,2" />
+                                <CheckBox x:Name="CheckUpdatesBox" Content="Проверять обновления при запуске" Margin="0,2" />
+                            </StackPanel>
+                        </GroupBox>
+
+                        <GroupBox Header="Горячие клавиши">
+                            <StackPanel>
+                                <Grid Margin="0,0,0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="220" />
+                                        <ColumnDefinition Width="180" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Показать/скрыть оверлей" />
+                                    <TextBox x:Name="HotkeyToggleBox" Grid.Column="1" IsReadOnly="True"
+                                             PreviewKeyDown="HotkeyBox_PreviewKeyDown" />
+                                </Grid>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="220" />
+                                        <ColumnDefinition Width="180" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Кто говорит (поверх любого окна)" />
+                                    <TextBox x:Name="HotkeyHudBox" Grid.Column="1" IsReadOnly="True"
+                                             PreviewKeyDown="HotkeyBox_PreviewKeyDown" />
+                                </Grid>
+                                <TextBlock Text="Кликните в поле и нажмите комбинацию. Пустое поле — клавиша отключена."
+                                           TextWrapping="Wrap" Foreground="#FF44506A" Margin="0,6,0,0" />
                             </StackPanel>
                         </GroupBox>
 
@@ -91,6 +119,7 @@
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
                                 <Grid.RowDefinitions>
+                                    <RowDefinition Height="30" />
                                     <RowDefinition Height="30" />
                                     <RowDefinition Height="30" />
                                     <RowDefinition Height="30" />
@@ -148,7 +177,12 @@
                                     <CheckBox x:Name="ShowServerNameBox" Content="Показывать имя сервера" VerticalAlignment="Center" />
                                 </StackPanel>
 
-                                <Button Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="2"
+                                <StackPanel Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="4" Orientation="Horizontal">
+                                    <CheckBox x:Name="ShowAvatarsBox" Content="Показывать аватары" Margin="0,0,16,0" VerticalAlignment="Center" />
+                                    <CheckBox x:Name="ShowGroupBadgesBox" Content="Показывать значки групп" VerticalAlignment="Center" />
+                                </StackPanel>
+
+                                <Button Grid.Row="6" Grid.Column="0" Grid.ColumnSpan="2"
                                         Content="Предпросмотр на рабочем столе"
                                         Click="OnPreviewClick"
                                         HorizontalAlignment="Left"

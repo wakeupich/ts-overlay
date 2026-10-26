@@ -193,7 +193,8 @@ public sealed class OverlayViewModel : ObservableObject
             wanted = wanted.Take(o.MaxRows).ToList();
         }
 
-        SyncRows(wanted);
+        _groupNames = snapshot.GroupNames;
+        SyncRows(wanted, o);
 
         HasRows = Rows.Count > 0;
         ShowEmpty = !HasRows;
@@ -229,7 +230,7 @@ public sealed class OverlayViewModel : ObservableObject
         Raise(nameof(PanelHeight));
     }
 
-    private void SyncRows(List<TsClientState> wanted)
+    private void SyncRows(List<TsClientState> wanted, OverlaySettings settings)
     {
         var sameOrder = Rows.Count == wanted.Count;
         if (sameOrder)
@@ -250,7 +251,7 @@ public sealed class OverlayViewModel : ObservableObject
             foreach (var client in wanted)
             {
                 var row = new ClientRow { Id = client.Id };
-                ConfigureRow(row, client);
+                ConfigureRow(row, client, settings);
                 Rows.Add(row);
             }
 
@@ -259,11 +260,11 @@ public sealed class OverlayViewModel : ObservableObject
 
         for (var i = 0; i < wanted.Count; i++)
         {
-            ConfigureRow(Rows[i], wanted[i]);
+            ConfigureRow(Rows[i], wanted[i], settings);
         }
     }
 
-    private void ConfigureRow(ClientRow row, TsClientState client)
+    private void ConfigureRow(ClientRow row, TsClientState client, OverlaySettings settings)
     {
         row.Nickname = client.Nickname;
         row.IsSelf = client.IsSelf;
@@ -276,11 +277,124 @@ public sealed class OverlayViewModel : ObservableObject
         row.StatusBrush = client.Talking ? TalkingBrush : DimBrush;
         row.MicBrush = client.InputMuted ? MutedBrush : DimBrush;
         row.TalkingBackground = client.Talking ? Tint(TalkingBrush, 0x2E) : Brushes.Transparent;
+        row.ShowAvatar = settings.ShowAvatars;
+        row.AvatarText = Initials(client.Nickname);
+        row.AvatarBrush = AvatarBrushFor(client.AvatarHash, client.Nickname);
+        row.AvatarSize = Math.Clamp(RowHeight - 6, 14, 22);
+        row.AvatarFontSize = Math.Max(8, row.AvatarSize * 0.44);
+        UpdateBadges(row, client, settings.ShowGroupBadges);
 
         // Смена этих флагов перерисовывает иконки.
         row.MicMuted = client.InputMuted;
         row.Deafened = client.OutputMuted;
         row.IsTalking = client.Talking;
+    }
+
+    private static readonly Color[] AvatarPalette =
+    {
+        Color.FromRgb(0x4C, 0x8B, 0xF5),
+        Color.FromRgb(0x34, 0xA8, 0x53),
+        Color.FromRgb(0xEA, 0x43, 0x35),
+        Color.FromRgb(0xF9, 0xAB, 0x00),
+        Color.FromRgb(0x9C, 0x27, 0xB0),
+        Color.FromRgb(0x00, 0xAC, 0xC1),
+        Color.FromRgb(0x8D, 0x6E, 0x63),
+        Color.FromRgb(0x5C, 0x6B, 0xC0),
+        Color.FromRgb(0x43, 0xA0, 0x47),
+        Color.FromRgb(0xEC, 0x40, 0x7A),
+    };
+
+    private IReadOnlyDictionary<int, string> _groupNames = new Dictionary<int, string>();
+
+    private static string Initials(string nickname)
+    {
+        var letters = new List<char>();
+        foreach (var part in nickname.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+        {
+            foreach (var ch in part)
+            {
+                if (char.IsLetterOrDigit(ch))
+                {
+                    letters.Add(char.ToUpper(ch, System.Globalization.CultureInfo.CurrentCulture));
+                    break;
+                }
+            }
+
+            if (letters.Count >= 2)
+            {
+                break;
+            }
+        }
+
+        if (letters.Count == 0)
+        {
+            return "?";
+        }
+
+        if (letters.Count == 1)
+        {
+            foreach (var ch in nickname)
+            {
+                if (char.IsLetterOrDigit(ch) && char.ToUpper(ch) != letters[0])
+                {
+                    letters.Add(char.ToUpper(ch));
+                    break;
+                }
+            }
+        }
+
+        return new string(letters.ToArray());
+    }
+
+    private static Brush AvatarBrushFor(string avatarHash, string nickname)
+    {
+        var seed = avatarHash.Length > 0 ? avatarHash : nickname;
+        var hash = 17;
+        foreach (var ch in seed)
+        {
+            hash = unchecked(hash * 31 + ch);
+        }
+
+        var color = AvatarPalette[Math.Abs(hash) % AvatarPalette.Length];
+        var brush = new SolidColorBrush(color);
+        brush.Freeze();
+        return brush;
+    }
+
+    private void UpdateBadges(ClientRow row, TsClientState client, bool enabled)
+    {
+        row.Badges.Clear();
+        if (!enabled || client.ServerGroups.Length == 0 || _groupNames.Count == 0)
+        {
+            row.ShowBadges = false;
+            return;
+        }
+
+        foreach (var raw in client.ServerGroups.Split(',', StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (!int.TryParse(raw.Trim(), out var id) || !_groupNames.TryGetValue(id, out var name) || name.Length == 0)
+            {
+                continue;
+            }
+
+            var color = AvatarPalette[Math.Abs(id) % AvatarPalette.Length];
+            var brush = new SolidColorBrush(Color.FromArgb(0xD0, color.R, color.G, color.B));
+            brush.Freeze();
+            row.Badges.Add(new GroupBadge
+            {
+                Text = name.Length <= 10 ? name : name[..9] + "…",
+                Tooltip = name,
+                Brush = brush,
+                FontSize = Math.Max(8, FontSize * 0.62),
+            });
+
+            if (row.Badges.Count >= 2)
+            {
+                break;
+            }
+        }
+
+        row.ShowBadges = row.Badges.Count > 0;
     }
 
     private static string Plural(int n, string one, string few, string many)
