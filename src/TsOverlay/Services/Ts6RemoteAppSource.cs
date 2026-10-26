@@ -32,6 +32,7 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
     private string _serverName = "";
     private volatile bool _resyncRequested;
     private bool _authenticated;
+    private readonly Dictionary<string, int> _unknownEvents = new();
     private DateTime _lastPermissionNotice = DateTime.MinValue;
     private string _status = "Подключение к TeamSpeak 6…";
 
@@ -107,7 +108,8 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
             }
             catch (Exception ex)
             {
-                Log.Error("TS6: соединение потеряно", ex);
+                // Обрыв сокета — штатная ситуация при перезапуске клиента.
+                Log.Info("TS6: нет связи с Remote Apps — " + ex.Message);
             }
             finally
             {
@@ -263,6 +265,14 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
                 return;
             }
 
+            // TS6 присылает часть событий в обёртке:
+            // {"type":"proto.ServerEvent","payload":{"connectionId":2,"clientEnterView":{...}}}
+            if (type.StartsWith("proto.", StringComparison.Ordinal))
+            {
+                HandleWrappedEvents(payload);
+                return;
+            }
+
             switch (type)
             {
                 case "auth":
@@ -302,16 +312,121 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
                 case "clientDisconnected":
                 case "channelMoved":
                 case "serverEdited":
-                    _resyncRequested = true;
+                    RequestResync("событие " + type);
                     break;
                 default:
-                    Log.Info($"TS6: событие {type} (не обрабатывается)");
+                    LogUnknown(type);
                     break;
             }
         }
         catch (Exception ex)
         {
             Log.Error("TS6: ошибка разбора сообщения: " + Truncate(json, 400), ex);
+        }
+    }
+
+    /// <summary>Разбор событий TS6 в обёртке proto.ClientEvent / proto.ServerEvent.</summary>
+    private void HandleWrappedEvents(JsonElement payload)
+    {
+        var connId = Int(payload, "connectionId");
+        if (connId != 0 && _connectionId != 0 && connId != _connectionId)
+        {
+            return;
+        }
+
+        foreach (var prop in payload.EnumerateObject())
+        {
+            if (prop.Name == "connectionId" || prop.Value.ValueKind != JsonValueKind.Object)
+            {
+                continue;
+            }
+
+            switch (prop.Name)
+            {
+                case "talkStatusChanged":
+                    HandleTalkStatus(prop.Value);
+                    break;
+                case "clientEnterView":
+                    HandleClientEnterView(prop.Value);
+                    break;
+                case "clientUpdated":
+                    HandleClientPropertiesUpdated(prop.Value);
+                    break;
+                case "clientMoved":
+                    HandleClientMoved(prop.Value);
+                    break;
+                case "clientLeftView":
+                    HandleClientLeftView(prop.Value);
+                    break;
+                case "channelCreated":
+                case "channelEdited":
+                case "channelPropertiesUpdated":
+                    HandleChannelUpsert(prop.Value);
+                    break;
+                case "channelDeleted":
+                    HandleChannelDeleted(prop.Value);
+                    break;
+                case "serverUpdated":
+                case "serverEdited":
+                case "channelMoved":
+                    break;
+                default:
+                    LogUnknown("proto." + prop.Name);
+                    break;
+            }
+        }
+    }
+
+    private void HandleClientEnterView(JsonElement payload)
+    {
+        var clientId = Int(payload, "clientId");
+        var channelId = Int(payload, "channelToId");
+        if (channelId <= 0)
+        {
+            channelId = Int(payload, "channelId");
+        }
+
+        if (clientId <= 0 || channelId <= 0 || !payload.TryGetProperty("properties", out var props))
+        {
+            RequestResync("clientEnterView без id/канала/свойств");
+            return;
+        }
+
+        lock (_stateLock)
+        {
+            var isSelf = clientId == _ownClientId;
+            _clients[clientId] = BuildClient(clientId, channelId, props, isSelf);
+            if (isSelf)
+            {
+                _ownChannelId = channelId;
+            }
+        }
+
+        Publish();
+    }
+
+    private void HandleClientLeftView(JsonElement payload)
+    {
+        var clientId = Int(payload, "clientId");
+        if (clientId <= 0)
+        {
+            return;
+        }
+
+        lock (_stateLock)
+        {
+            _clients.Remove(clientId);
+        }
+
+        Publish();
+    }
+
+    private void LogUnknown(string type)
+    {
+        if (!_unknownEvents.TryGetValue(type, out var seen) || seen < 3)
+        {
+            _unknownEvents[type] = seen + 1;
+            Log.Info($"TS6: необработанное событие {type}");
         }
     }
 
@@ -539,19 +654,27 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
 
         if (id <= 0 || !payload.TryGetProperty("properties", out var props))
         {
-            _resyncRequested = true;
+            RequestResync("channel upsert без id/свойств");
             return;
         }
 
         lock (_stateLock)
         {
             var parent = ParseInt(Str(payload, "parentId"));
+            _channels.TryGetValue(id, out var old);
+            var name = Str(props, "name");
+            if (name.Length == 0 && old != null)
+            {
+                name = old.Name;
+            }
+
+            var order = Str(props, "order");
             _channels[id] = new TsChannelState
             {
                 Id = id,
-                ParentId = parent,
-                Name = Str(props, "name"),
-                Order = ParseInt(Str(props, "order")),
+                ParentId = parent != 0 ? parent : old?.ParentId ?? 0,
+                Name = name,
+                Order = order.Length > 0 ? ParseInt(order) : old?.Order ?? 0,
             };
         }
 
@@ -584,7 +707,17 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
 
         var clientId = Int(payload, "clientId");
         var newChannel = Int(payload, "newChannelId");
+        if (newChannel <= 0)
+        {
+            newChannel = Int(payload, "channelToId");
+        }
+
         var oldChannel = Int(payload, "oldChannelId");
+        if (oldChannel <= 0)
+        {
+            oldChannel = Int(payload, "channelFromId");
+        }
+
         if (clientId <= 0)
         {
             return;
@@ -613,11 +746,10 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
                     _ownChannelId = newChannel;
                 }
             }
-
-            if (oldChannel <= 0 && newChannel > 0)
+            else if (oldChannel <= 0)
             {
-                // Клиент зашёл на сервер — нужны полные свойства (mute и т.п.).
-                _resyncRequested = true;
+                // Вошёл новый клиент, а свойств в событии нет — дочитаем полным снимком.
+                RequestResync($"вход клиента {clientId} без свойств");
             }
         }
 
@@ -640,8 +772,13 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
 
         lock (_stateLock)
         {
-            var channelId = _clients.TryGetValue(clientId, out var existing) ? existing.ChannelId : 0;
-            _clients[clientId] = BuildClient(clientId, channelId, props, clientId == _ownClientId);
+            if (!_clients.TryGetValue(clientId, out var existing))
+            {
+                existing = new TsClientState { Id = clientId, IsSelf = clientId == _ownClientId };
+                _clients[clientId] = existing;
+            }
+
+            _clients[clientId] = ApplyProperties(existing, props);
         }
 
         Publish();
@@ -675,17 +812,44 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
     private void HandleSelfProperty(JsonElement payload)
     {
         var connId = Int(payload, "connectionId");
+        var flag = Str(payload, "flag");
+        var newValue = Bool(payload, "newValue");
+
         if (connId != 0 && connId != _connectionId)
         {
             // Активной стала другая вкладка сервера — переподключаемся, чтобы получить её состояние.
-            _resyncRequested = true;
+            RequestResync($"смена активного подключения {connId} (было {_connectionId})");
+            return;
         }
+
+        lock (_stateLock)
+        {
+            if (_clients.TryGetValue(_ownClientId, out var me))
+            {
+                var updated = flag switch
+                {
+                    "flagTalking" => me.Copy(talking: newValue),
+                    "inputMuted" => me.Copy(inputMuted: newValue),
+                    "outputMuted" => me.Copy(outputMuted: newValue),
+                    "isMuted" => me.Copy(inputMuted: newValue),
+                    _ => me,
+                };
+
+                if (!ReferenceEquals(updated, me))
+                {
+                    _clients[_ownClientId] = updated;
+                }
+            }
+        }
+
+        Publish();
     }
 
     private void HandleConnectStatus(JsonElement payload)
     {
         var connId = Int(payload, "connectionId");
         var status = Int(payload, "status");
+        Log.Info($"TS6: connectStatus={status} conn={connId} active={_connectionId}");
 
         if (status == 0)
         {
@@ -708,7 +872,7 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
 
         if (status == 4)
         {
-            _resyncRequested = true;
+            RequestResync($"connectStatus=4 conn={connId} (активно {_connectionId})");
         }
     }
 
@@ -737,27 +901,81 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
 
     private TsClientState BuildClient(int id, int channelId, JsonElement props, bool isSelf)
     {
-        var inputMuted = Bool(props, "inputMuted") || Bool(props, "inputDeactivated");
-        var outputMuted = Bool(props, "outputMuted") || Bool(props, "outputOnlyMuted");
-        return new TsClientState
+        var fresh = new TsClientState { Id = id, ChannelId = channelId, IsSelf = isSelf };
+        var result = ApplyProperties(fresh, props);
+        return result.Copy(isQuery: IsQueryClient(props));
+    }
+
+    /// <summary>
+    /// Применяет к клиенту только те свойства, которые реально пришли в событии
+    /// (в TS6 частичные обновления: clientUpdated присылает один-два ключа).
+    /// </summary>
+    private TsClientState ApplyProperties(TsClientState client, JsonElement props)
+    {
+        var nickname = Has(props, "nickname") ? Str(props, "nickname")
+            : Has(props, "name") ? Str(props, "name")
+            : null;
+
+        bool? inputMuted = null;
+        if (Has(props, "inputMuted"))
         {
-            Id = id,
-            ChannelId = channelId,
-            Nickname = Str(props, "nickname"),
-            Talking = Bool(props, "flagTalking"),
-            InputMuted = inputMuted,
-            OutputMuted = outputMuted,
-            Away = Bool(props, "away"),
-            PrioritySpeaker = Bool(props, "isPrioritySpeaker"),
-            ChannelCommander = Bool(props, "isChannelCommander"),
-            IsSelf = isSelf,
-            IsQuery = Int(props, "type") == 1,
+            inputMuted = Bool(props, "inputMuted");
+        }
+
+        if (Has(props, "inputDeactivated"))
+        {
+            inputMuted = (inputMuted ?? false) || Bool(props, "inputDeactivated");
+        }
+
+        bool? outputMuted = null;
+        if (Has(props, "outputMuted"))
+        {
+            outputMuted = Bool(props, "outputMuted");
+        }
+
+        if (Has(props, "outputOnlyMuted"))
+        {
+            outputMuted = (outputMuted ?? false) || Bool(props, "outputOnlyMuted");
+        }
+
+        return client.Copy(
+            nickname: nickname,
+            inputMuted: inputMuted,
+            outputMuted: outputMuted,
+            talking: Has(props, "flagTalking") ? Bool(props, "flagTalking") : null,
+            away: Has(props, "away") ? Bool(props, "away") : null,
+            prioritySpeaker: Has(props, "isPrioritySpeaker") ? Bool(props, "isPrioritySpeaker") : null,
+            channelCommander: Has(props, "isChannelCommander") ? Bool(props, "isChannelCommander") : null,
+            isQuery: IsQueryClient(props) ? true : null);
+    }
+
+    private static bool IsQueryClient(JsonElement props)
+    {
+        if (!Has(props, "type"))
+        {
+            return false;
+        }
+
+        return props.GetProperty("type").ValueKind switch
+        {
+            JsonValueKind.String => props.GetProperty("type").GetString()?.Contains("QUERY", StringComparison.OrdinalIgnoreCase) == true,
+            JsonValueKind.Number => props.GetProperty("type").TryGetInt32(out var number) && number == 1,
+            _ => false,
         };
     }
+
+    private static bool Has(JsonElement element, string name)
+        => element.ValueKind == JsonValueKind.Object && element.TryGetProperty(name, out _);
 
     private void SetStatus(string status)
     {
         _status = status;
+    }
+
+    private void RequestResync(string reason)
+    {
+        _resyncRequested = true;
+        Log.Info("TS6: нужна полная синхронизация — " + reason);
     }
 
     private void Publish()

@@ -17,6 +17,8 @@ public sealed class TeamSpeakMonitor : IAsyncDisposable
     private TsClientKind _kind = TsClientKind.None;
     private bool? _lastAvailability;
     private bool _started;
+    private bool _autoSwitched;
+    private DateTime _kindSince = DateTime.UtcNow;
 
     public TeamSpeakMonitor(Func<AppConfig> config, Dispatcher dispatcher)
     {
@@ -57,6 +59,7 @@ public sealed class TeamSpeakMonitor : IAsyncDisposable
     {
         await StopSourceAsync();
         _kind = TsClientKind.None;
+        _autoSwitched = false;
         await CheckAsync();
     }
 
@@ -100,10 +103,30 @@ public sealed class TeamSpeakMonitor : IAsyncDisposable
                 _ => ts3 ? TsClientKind.Ts3 : ts6 ? TsClientKind.Ts6 : TsClientKind.None,
             };
 
+            // В авто-режиме: если выбранный клиент запущен, но не подключён к серверу,
+            // а второй клиент подключён — переключаемся на него.
+            if (cfg.ClientMode == "Auto" && desired == _kind && _kind != TsClientKind.None && !_autoSwitched &&
+                !Current.Connected && DateTime.UtcNow - _kindSince > TimeSpan.FromSeconds(6))
+            {
+                if (_kind == TsClientKind.Ts3 && ts6)
+                {
+                    Log.Info("Монитор: TS3 не подключён, переключаюсь на TS6");
+                    desired = TsClientKind.Ts6;
+                    _autoSwitched = true;
+                }
+                else if (_kind == TsClientKind.Ts6 && ts3)
+                {
+                    Log.Info("Монитор: TS6 не подключён, переключаюсь на TS3");
+                    desired = TsClientKind.Ts3;
+                    _autoSwitched = true;
+                }
+            }
+
             if (desired != _kind)
             {
                 await StopSourceAsync();
                 _kind = desired;
+                _kindSince = DateTime.UtcNow;
                 if (desired != TsClientKind.None)
                 {
                     StartSource(desired, cfg);

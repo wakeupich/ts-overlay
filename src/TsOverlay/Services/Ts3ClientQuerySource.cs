@@ -150,7 +150,8 @@ public sealed class Ts3ClientQuerySource : ITeamSpeakSource
             }
             catch (Exception ex)
             {
-                Log.Error("TS3: соединение потеряно", ex);
+                // Штатная ситуация (клиент ещё не поднял ClientQuery) — без стектрейса в журнале.
+                Log.Info("TS3: нет связи с ClientQuery — " + ex.Message);
                 Publish(_authFailed ? "Неверный ключ ClientQuery" : "Нет связи с TeamSpeak 3");
             }
             finally
