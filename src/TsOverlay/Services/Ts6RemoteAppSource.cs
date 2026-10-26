@@ -32,6 +32,7 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
     private string _serverName = "";
     private volatile bool _resyncRequested;
     private bool _authenticated;
+    private bool _authDenied;
     private readonly Dictionary<string, int> _unknownEvents = new();
     private DateTime _lastPermissionNotice = DateTime.MinValue;
     private string _status = "Подключение к TeamSpeak 6…";
@@ -125,15 +126,23 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
 
             if (!wasAuthenticated)
             {
-                // Скорее всего, пользователь ещё не разрешил приложение в клиенте.
                 var now = DateTime.UtcNow;
-                if (now - _lastPermissionNotice > TimeSpan.FromMinutes(2))
+                if (_authDenied)
                 {
-                    _lastPermissionNotice = now;
-                    UserNotice?.Invoke("TeamSpeak 6: разрешите подключение оверлея (Настройки → Remote Apps).");
+                    // Приложение действительно не разрешено в клиенте — напоминаем редко.
+                    SetStatus("TeamSpeak 6: доступ запрещён — разрешите приложение");
+                    if (now - _lastPermissionNotice > TimeSpan.FromMinutes(10))
+                    {
+                        _lastPermissionNotice = now;
+                        UserNotice?.Invoke("TeamSpeak 6: разрешите подключение оверлея в клиенте (Настройки → Remote Apps).");
+                    }
+                }
+                else
+                {
+                    // Сервер/клиент временно недоступен — это не отказ в разрешениях.
+                    SetStatus("TeamSpeak 6: нет связи, переподключаюсь…");
                 }
 
-                SetStatus("TeamSpeak 6: ожидаю разрешение приложения");
                 Publish();
             }
             else
@@ -144,7 +153,7 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
 
             try
             {
-                await Task.Delay(wasAuthenticated ? TimeSpan.FromSeconds(3) : TimeSpan.FromSeconds(10), ct);
+                await Task.Delay(wasAuthenticated ? TimeSpan.FromSeconds(5) : TimeSpan.FromSeconds(10), ct);
             }
             catch (OperationCanceledException)
             {
@@ -210,7 +219,6 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
 
             SetStatus("TeamSpeak 6: ожидаю разрешение приложения");
             Publish();
-            UserNotice?.Invoke("TeamSpeak 6: разрешите подключение оверлея в клиенте (Настройки → Remote Apps).");
         }, ct);
     }
 
@@ -304,6 +312,10 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
                 case "connectStatusChanged":
                     HandleConnectStatus(payload);
                     break;
+                case "neededPermissions":
+                case "clientNeededPermissions":
+                    // Клиент запрашивает подтверждение прав; это не ошибка и не повод для уведомления.
+                    break;
                 case "serverPropertiesUpdated":
                     HandleServerProperties(payload);
                     break;
@@ -369,6 +381,8 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
                 case "serverUpdated":
                 case "serverEdited":
                 case "channelMoved":
+                case "neededPermissions":
+                case "clientNeededPermissions":
                     break;
                 default:
                     LogUnknown("proto." + prop.Name);
@@ -442,11 +456,14 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
 
         if (statusCode != 0)
         {
+            _authDenied = true;
             Log.Error($"TS6: авторизация отклонена ({statusCode} {statusMessage})");
             SetStatus("TeamSpeak 6: доступ запрещён — разрешите приложение");
             Publish();
             return;
         }
+
+        _authDenied = false;
 
         var apiKey = Str(payload, "apiKey");
         if (apiKey.Length > 0 && apiKey != _getApiKey())
