@@ -1,6 +1,7 @@
 <Window x:Class="TsOverlay.Views.SettingsWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="clr-namespace:TsOverlay.Controls"
         Title="TS Overlay — настройки"
         Icon="pack://application:,,,/app.ico"
         Width="780"
@@ -14,6 +15,85 @@
             <Setter Property="Padding" Value="4,3" />
             <Setter Property="VerticalContentAlignment" Value="Center" />
         </Style>
+        <Style TargetType="{x:Type controls:SpinBox}" BasedOn="{StaticResource {x:Type TextBox}}">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type controls:SpinBox}">
+                        <Border x:Name="SpinBorder"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                SnapsToDevicePixels="True">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="18" />
+                                </Grid.ColumnDefinitions>
+                                <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}"
+                                              VerticalAlignment="Center" />
+                                <Grid Grid.Column="1">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="*" />
+                                        <RowDefinition Height="*" />
+                                    </Grid.RowDefinitions>
+                                    <RepeatButton x:Name="PART_Up" Grid.Row="0" Content="▲"
+                                                  FontSize="7" Foreground="#FF44506A" Padding="0" Focusable="False"
+                                                  BorderThickness="0" Background="Transparent"
+                                                  Delay="300" Interval="70" />
+                                    <RepeatButton x:Name="PART_Down" Grid.Row="1" Content="▼"
+                                                  FontSize="7" Foreground="#FF44506A" Padding="0" Focusable="False"
+                                                  BorderThickness="0" Background="Transparent"
+                                                  Delay="300" Interval="70" />
+                                </Grid>
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                                <Setter TargetName="SpinBorder" Property="BorderBrush" Value="#FF4C8BF5" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <ContextMenu x:Key="ColorPaletteMenu">
+            <MenuItem Header="Тёмная панель" Tag="#FF1B2430" Click="ColorSwatch_Click">
+                <MenuItem.Icon><Border Width="14" Height="14" Background="#FF1B2430" BorderBrush="#FF8899AA" BorderThickness="1" /></MenuItem.Icon>
+            </MenuItem>
+            <MenuItem Header="Почти чёрный" Tag="#FF101418" Click="ColorSwatch_Click">
+                <MenuItem.Icon><Border Width="14" Height="14" Background="#FF101418" BorderBrush="#FF8899AA" BorderThickness="1" /></MenuItem.Icon>
+            </MenuItem>
+            <MenuItem Header="Синий вечер" Tag="#FF0E1A2B" Click="ColorSwatch_Click">
+                <MenuItem.Icon><Border Width="14" Height="14" Background="#FF0E1A2B" BorderBrush="#FF8899AA" BorderThickness="1" /></MenuItem.Icon>
+            </MenuItem>
+            <MenuItem Header="Тёмно-бордовый" Tag="#FF2B1B1B" Click="ColorSwatch_Click">
+                <MenuItem.Icon><Border Width="14" Height="14" Background="#FF2B1B1B" BorderBrush="#FF8899AA" BorderThickness="1" /></MenuItem.Icon>
+            </MenuItem>
+            <MenuItem Header="Светлый текст" Tag="#FFE6EDF7" Click="ColorSwatch_Click">
+                <MenuItem.Icon><Border Width="14" Height="14" Background="#FFE6EDF7" BorderBrush="#FF8899AA" BorderThickness="1" /></MenuItem.Icon>
+            </MenuItem>
+            <MenuItem Header="Белый" Tag="#FFFFFFFF" Click="ColorSwatch_Click">
+                <MenuItem.Icon><Border Width="14" Height="14" Background="#FFFFFFFF" BorderBrush="#FF8899AA" BorderThickness="1" /></MenuItem.Icon>
+            </MenuItem>
+            <MenuItem Header="Серо-голубой" Tag="#FF9AA7B8" Click="ColorSwatch_Click">
+                <MenuItem.Icon><Border Width="14" Height="14" Background="#FF9AA7B8" BorderBrush="#FF8899AA" BorderThickness="1" /></MenuItem.Icon>
+            </MenuItem>
+            <MenuItem Header="Синий" Tag="#FF4C8BF5" Click="ColorSwatch_Click">
+                <MenuItem.Icon><Border Width="14" Height="14" Background="#FF4C8BF5" BorderBrush="#FF8899AA" BorderThickness="1" /></MenuItem.Icon>
+            </MenuItem>
+            <MenuItem Header="Зелёный" Tag="#FF3DD68C" Click="ColorSwatch_Click">
+                <MenuItem.Icon><Border Width="14" Height="14" Background="#FF3DD68C" BorderBrush="#FF8899AA" BorderThickness="1" /></MenuItem.Icon>
+            </MenuItem>
+            <MenuItem Header="Янтарный" Tag="#FFFFB020" Click="ColorSwatch_Click">
+                <MenuItem.Icon><Border Width="14" Height="14" Background="#FFFFB020" BorderBrush="#FF8899AA" BorderThickness="1" /></MenuItem.Icon>
+            </MenuItem>
+            <MenuItem Header="Красный" Tag="#FFFF5C5C" Click="ColorSwatch_Click">
+                <MenuItem.Icon><Border Width="14" Height="14" Background="#FFFF5C5C" BorderBrush="#FF8899AA" BorderThickness="1" /></MenuItem.Icon>
+            </MenuItem>
+            <MenuItem Header="Фиолетовый" Tag="#FFB06CFF" Click="ColorSwatch_Click">
+                <MenuItem.Icon><Border Width="14" Height="14" Background="#FFB06CFF" BorderBrush="#FF8899AA" BorderThickness="1" /></MenuItem.Icon>
+            </MenuItem>
+        </ContextMenu>
         <Style TargetType="ComboBox">
             <Setter Property="Padding" Value="4,2" />
         </Style>
@@ -33,7 +113,7 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <TabControl Grid.Row="0">
+        <TabControl x:Name="MainTabs" Grid.Row="0" SelectionChanged="MainTabs_SelectionChanged">
 
             <!-- ОБЩИЕ -->
             <TabItem Header="Общие">
@@ -108,7 +188,7 @@
             </TabItem>
 
             <!-- ОВЕРЛЕЙ -->
-            <TabItem Header="Оверлей">
+            <TabItem x:Name="OverlayTab" Header="Оверлей">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel Margin="10">
                         <GroupBox Header="Положение и размер">
@@ -150,21 +230,33 @@
                                         <ColumnDefinition Width="8" />
                                         <ColumnDefinition Width="*" />
                                     </Grid.ColumnDefinitions>
-                                    <TextBox x:Name="MarginXBox" />
-                                    <TextBox x:Name="MarginYBox" Grid.Column="2" />
+                                    <controls:SpinBox x:Name="MarginXBox" Step="1" Minimum="-4000" Maximum="4000" />
+                                    <controls:SpinBox x:Name="MarginYBox" Grid.Column="2" Step="1" Minimum="-4000" Maximum="4000" />
                                 </Grid>
 
                                 <TextBlock Grid.Row="1" Text="Ширина панели" />
-                                <TextBox x:Name="WidthBox" Grid.Row="1" Grid.Column="1" />
+                                <controls:SpinBox x:Name="WidthBox" Grid.Row="1" Grid.Column="1" Step="1" Minimum="140" Maximum="900" />
 
                                 <TextBlock Grid.Row="1" Grid.Column="2" Text="Масштаб" />
-                                <TextBox x:Name="ScaleBox" Grid.Row="1" Grid.Column="3" />
+                                <Grid Grid.Row="1" Grid.Column="3" Grid.ColumnSpan="2">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="62" />
+                                    </Grid.ColumnDefinitions>
+                                    <Slider x:Name="ScaleSlider" Minimum="0.5" Maximum="3"
+                                            SmallChange="0.05" LargeChange="0.1"
+                                            VerticalAlignment="Center"
+                                            ValueChanged="ScaleSlider_ValueChanged" />
+                                    <controls:SpinBox x:Name="ScaleBox" Grid.Column="1" Margin="8,0,0,0"
+                                                      Step="0.05" Decimals="2" Minimum="0.5" Maximum="3"
+                                                      TextChanged="ScaleBox_TextChanged" />
+                                </Grid>
 
                                 <TextBlock Grid.Row="2" Text="Высота строки" />
-                                <TextBox x:Name="RowHeightBox" Grid.Row="2" Grid.Column="1" />
+                                <controls:SpinBox x:Name="RowHeightBox" Grid.Row="2" Grid.Column="1" Step="1" Minimum="16" Maximum="60" />
 
                                 <TextBlock Grid.Row="2" Grid.Column="2" Text="Размер шрифта" />
-                                <TextBox x:Name="FontSizeBox" Grid.Row="2" Grid.Column="3" />
+                                <controls:SpinBox x:Name="FontSizeBox" Grid.Row="2" Grid.Column="3" Step="1" Minimum="8" Maximum="36" />
 
                                 <TextBlock Grid.Row="3" Text="Прозрачность фона" />
                                 <Grid Grid.Row="3" Grid.Column="1" Margin="0,0,8,0">
@@ -180,10 +272,10 @@
                                 </Grid>
 
                                 <TextBlock Grid.Row="3" Grid.Column="2" Text="Максимум строк" />
-                                <TextBox x:Name="MaxRowsBox" Grid.Row="3" Grid.Column="3" />
+                                <controls:SpinBox x:Name="MaxRowsBox" Grid.Row="3" Grid.Column="3" Step="1" Minimum="1" Maximum="64" />
 
                                 <TextBlock Grid.Row="4" Text="Скругление углов" />
-                                <TextBox x:Name="CornerRadiusBox" Grid.Row="4" Grid.Column="1" />
+                                <controls:SpinBox x:Name="CornerRadiusBox" Grid.Row="4" Grid.Column="1" Step="1" Minimum="0" Maximum="40" />
 
                                 <StackPanel Grid.Row="4" Grid.Column="2" Grid.ColumnSpan="3" Orientation="Horizontal">
                                     <CheckBox x:Name="ShowHeaderBox" Content="Показывать шапку" Margin="0,0,16,0" VerticalAlignment="Center" />
@@ -219,19 +311,64 @@
                                 </Grid.RowDefinitions>
 
                                 <TextBlock Text="Фон панели" />
-                                <TextBox x:Name="BackgroundBox" Grid.Column="1" />
+                                <Grid Grid.Column="1">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="22" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox x:Name="BackgroundBox" />
+                                    <Button Grid.Column="1" Content="▼" FontSize="7" Padding="0" Focusable="False"
+                                            Tag="{Binding ElementName=BackgroundBox}" Click="ColorPalette_Click"
+                                            ToolTip="Выбрать из палитры" />
+                                </Grid>
 
                                 <TextBlock Grid.Column="3" Text="Текст" />
-                                <TextBox x:Name="TextColorBox" Grid.Column="4" />
+                                <Grid Grid.Column="4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="22" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox x:Name="TextColorBox" />
+                                    <Button Grid.Column="1" Content="▼" FontSize="7" Padding="0" Focusable="False"
+                                            Tag="{Binding ElementName=TextColorBox}" Click="ColorPalette_Click"
+                                            ToolTip="Выбрать из палитры" />
+                                </Grid>
 
                                 <TextBlock Grid.Row="1" Text="Приглушённый текст" />
-                                <TextBox x:Name="DimColorBox" Grid.Row="1" Grid.Column="1" />
+                                <Grid Grid.Row="1" Grid.Column="1">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="22" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox x:Name="DimColorBox" />
+                                    <Button Grid.Column="1" Content="▼" FontSize="7" Padding="0" Focusable="False"
+                                            Tag="{Binding ElementName=DimColorBox}" Click="ColorPalette_Click"
+                                            ToolTip="Выбрать из палитры" />
+                                </Grid>
 
                                 <TextBlock Grid.Row="1" Grid.Column="3" Text="Говорит" />
-                                <TextBox x:Name="TalkingColorBox" Grid.Row="1" Grid.Column="4" />
+                                <Grid Grid.Row="1" Grid.Column="4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="22" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox x:Name="TalkingColorBox" />
+                                    <Button Grid.Column="1" Content="▼" FontSize="7" Padding="0" Focusable="False"
+                                            Tag="{Binding ElementName=TalkingColorBox}" Click="ColorPalette_Click"
+                                            ToolTip="Выбрать из палитры" />
+                                </Grid>
 
                                 <TextBlock Grid.Row="2" Text="Микрофон выключен" />
-                                <TextBox x:Name="MutedColorBox" Grid.Row="2" Grid.Column="1" />
+                                <Grid Grid.Row="2" Grid.Column="1">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="22" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox x:Name="MutedColorBox" />
+                                    <Button Grid.Column="1" Content="▼" FontSize="7" Padding="0" Focusable="False"
+                                            Tag="{Binding ElementName=MutedColorBox}" Click="ColorPalette_Click"
+                                            ToolTip="Выбрать из палитры" />
+                                </Grid>
                             </Grid>
                         </GroupBox>
                     </StackPanel>
@@ -298,7 +435,7 @@
                                         <ColumnDefinition Width="120" />
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Text="Порт" />
-                                    <TextBox x:Name="Ts3PortBox" Grid.Column="1" />
+                                    <controls:SpinBox x:Name="Ts3PortBox" Grid.Column="1" Step="1" Minimum="1" Maximum="65535" />
                                 </Grid>
                             </StackPanel>
                         </GroupBox>
@@ -321,7 +458,7 @@
                                         <ColumnDefinition Width="120" />
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Text="Порт" />
-                                    <TextBox x:Name="Ts6PortBox" Grid.Column="1" />
+                                    <controls:SpinBox x:Name="Ts6PortBox" Grid.Column="1" Step="1" Minimum="1" Maximum="65535" />
                                 </Grid>
                             </StackPanel>
                         </GroupBox>

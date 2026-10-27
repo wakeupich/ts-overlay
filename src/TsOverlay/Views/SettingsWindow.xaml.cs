@@ -4,6 +4,7 @@ using System.Globalization;
 using System.IO;
 using System.Text.Json;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 using Microsoft.Win32;
 using TsOverlay.Models;
@@ -16,6 +17,7 @@ public partial class SettingsWindow : Window
     private readonly AppConfig _live;
     private readonly AppConfig _working;
     private readonly Action<AppConfig> _applyPreview;
+    private TextBox? _colorTarget;
     private readonly Action _restore;
     private readonly ObservableCollection<GameRow> _games = new();
     private bool _saved;
@@ -78,6 +80,7 @@ public partial class SettingsWindow : Window
         MarginYBox.Text = o.MarginY.ToString(CultureInfo.InvariantCulture);
         WidthBox.Text = o.Width.ToString("0.##", CultureInfo.InvariantCulture);
         ScaleBox.Text = o.Scale.ToString("0.##", CultureInfo.InvariantCulture);
+        ScaleSlider.Value = Math.Clamp(o.Scale, 0.5, 3.0);
         RowHeightBox.Text = o.RowHeight.ToString("0.##", CultureInfo.InvariantCulture);
         FontSizeBox.Text = o.FontSize.ToString("0.##", CultureInfo.InvariantCulture);
         OpacitySlider.Value = Math.Clamp(o.Opacity, 0.2, 1.0);
@@ -222,6 +225,73 @@ public partial class SettingsWindow : Window
 
         if (IsLoaded)
         {
+            ReadInto(_working);
+            _applyPreview(_working);
+        }
+    }
+
+    private void ScaleSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (!IsLoaded || ScaleBox == null)
+        {
+            return;
+        }
+
+        ScaleBox.Text = e.NewValue.ToString("0.##", CultureInfo.InvariantCulture);
+        ReadInto(_working);
+        _applyPreview(_working);
+    }
+
+    private void ScaleBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (!IsLoaded || ScaleSlider == null)
+        {
+            return;
+        }
+
+        var text = (ScaleBox.Text ?? string.Empty).Trim().Replace(',', '.');
+        if (double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var value))
+        {
+            ScaleSlider.Value = Math.Clamp(value, ScaleSlider.Minimum, ScaleSlider.Maximum);
+        }
+    }
+
+    private void MainTabs_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!IsLoaded || !ReferenceEquals(sender, MainTabs))
+        {
+            return;
+        }
+
+        if (ReferenceEquals(MainTabs.SelectedItem, OverlayTab))
+        {
+            // Зашли на вкладку оверлея — сразу показываем предпросмотр.
+            ReadInto(_working);
+            _applyPreview(_working);
+        }
+    }
+
+    private void ColorPalette_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button button || button.Tag is not TextBox target)
+        {
+            return;
+        }
+
+        _colorTarget = target;
+        if (TryFindResource("ColorPaletteMenu") is ContextMenu menu)
+        {
+            menu.PlacementTarget = button;
+            menu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
+            menu.IsOpen = true;
+        }
+    }
+
+    private void ColorSwatch_Click(object sender, RoutedEventArgs e)
+    {
+        if (_colorTarget != null && sender is MenuItem item && item.Tag is string hex)
+        {
+            _colorTarget.Text = hex;
             ReadInto(_working);
             _applyPreview(_working);
         }
