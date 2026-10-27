@@ -93,7 +93,6 @@ try {
         "backup: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss zzz')",
         "source: $sourceFull",
         "repo: https://github.com/wakeupich/ts-overlay",
-        "visibility: private",
         "commit: $commit",
         "tag: $Tag",
         "version: $version",
