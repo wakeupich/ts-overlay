@@ -169,6 +169,8 @@ public partial class SettingsWindow : Window
         Close();
     }
 
+    private void OnCancel(object sender, RoutedEventArgs e) => Close();
+
     private void ReadInto(AppConfig config)
     {
         config.ClientMode = SelectedTag(ClientModeBox, "Auto");
