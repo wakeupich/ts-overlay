@@ -287,6 +287,7 @@ public sealed class OverlayViewModel : ObservableObject
         row.AvatarText = Initials(client.Nickname);
         row.AvatarBrush = AvatarBrushFor(client.AvatarHash, client.Nickname);
         row.AvatarSize = Math.Clamp(RowHeight - 6, 14, 22);
+        row.IconSize = Math.Clamp(RowHeight * 0.7, 16, 30);
         row.AvatarFontSize = Math.Max(8, row.AvatarSize * 0.44);
         UpdateBadges(row, client, settings.ShowGroupBadges);
 

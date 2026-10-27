@@ -33,6 +33,7 @@ public sealed class ClientRow : ObservableObject
     private Brush _avatarBrush = Brushes.SteelBlue;
     private double _avatarSize = 20;
     private double _avatarFontSize = 9;
+    private double _iconSize = 18;
     private bool _showAvatar = true;
     private bool _showBadges = true;
 
@@ -56,6 +57,13 @@ public sealed class ClientRow : ObservableObject
     {
         get => _avatarSize;
         set => Set(ref _avatarSize, value);
+    }
+
+    /// <summary>Размер иконок «микрофон/звук выключен»; растёт вместе с высотой строки.</summary>
+    public double IconSize
+    {
+        get => _iconSize;
+        set => Set(ref _iconSize, value);
     }
 
     public double AvatarFontSize
