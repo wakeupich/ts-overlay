@@ -31,6 +31,7 @@ public sealed class AppHost
     private bool _pinned;
     private bool _hudVisible;
     private bool _settingsOpen;
+    private AppConfig? _previewConfig;
     private bool _previewBeforeSettings;
     private bool _everSawTeamSpeak;
     private bool _shuttingDown;
@@ -176,10 +177,13 @@ public sealed class AppHost
     {
         try
         {
-            _viewModel.Apply(snapshot, Config);
+            // Пока настройки открыты, события канала не должны откатывать оверлей
+            // к сохранённому конфигу — рисуем текущий предпросмотр.
+            var effective = _settingsOpen && _previewConfig != null ? _previewConfig : Config;
+            _viewModel.Apply(snapshot, effective);
             _overlay?.RefreshLayout();
 
-            if (!Config.OverlayEnabled)
+            if (!effective.OverlayEnabled)
             {
                 _tray?.SetStatus("Оверлей выключен");
                 return;
@@ -190,7 +194,7 @@ public sealed class AppHost
             {
                 if (!_overlay!.IsShown)
                 {
-                    ShowPreview(Config);
+                    ShowPreview(effective);
                 }
 
                 _tray?.SetStatus(StatusLine(snapshot));
@@ -343,6 +347,7 @@ public sealed class AppHost
         {
             _settings = null;
             _settingsOpen = false;
+            _previewConfig = null;
             _preview = _previewBeforeSettings;
             _tray?.SetPreviewChecked(_preview);
             RestoreLiveConfig();
@@ -689,6 +694,7 @@ public sealed class AppHost
 
     private void ApplyPreviewConfig(AppConfig config)
     {
+        _previewConfig = config;
         _viewModel.Apply(_monitor?.Current ?? TsSnapshot.Empty, config);
         _overlay?.Configure(config);
         _overlay?.RefreshLayout();
