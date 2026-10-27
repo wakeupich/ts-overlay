@@ -114,6 +114,18 @@ wix build .\installer\TsOverlay.wxs -d SourceDir="$PWD\dist" -d IconPath="$PWD\s
   -o .\dist\TsOverlay-1.1.9-Setup.msi -arch x64
 ```
 
+## Бэкап после релиза
+
+После каждого релиза (тег + ассеты) — сразу синхронизировать проект в резервную копию:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\backup-to-work.ps1
+```
+
+Скрипт делает зеркальную копию `X:\GitProjects\TeamspeakOverlay` → `X:\Work\TeamspeakOverlay`
+(`robocopy /MIR`, без `bin`, `obj`, `.vs`, `dist-standalone`), сохраняет `.git` и пишет
+`BACKUP-INFO.txt` с датой, коммитом, тегом и версией.
+
 ## Первый запуск
 
 1. Запустите `TsOverlay.exe` — появится иконка в трее, откроется окно настроек.
