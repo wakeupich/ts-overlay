@@ -27,6 +27,7 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
     private Task? _worker;
     private ClientWebSocket? _ws;
     private int _connectionId;
+    private int _preferredConnectionId;
     private int _ownClientId;
     private int _ownChannelId;
     private string _serverName = "";
@@ -320,11 +321,14 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
                     HandleServerProperties(payload);
                     break;
                 case "clientJoined":
-                case "clientLeft":
-                case "clientDisconnected":
                 case "channelMoved":
                 case "serverEdited":
                     RequestResync("событие " + type);
+                    break;
+                case "clientLeft":
+                case "clientLeftView":
+                case "clientDisconnected":
+                    HandleClientLeftView(payload);
                     break;
                 default:
                     LogUnknown(type);
@@ -343,6 +347,25 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
         var connId = Int(payload, "connectionId");
         if (connId != 0 && _connectionId != 0 && connId != _connectionId)
         {
+            // Даже у неактивного подключения смотрим только сигнал смены активного сервера
+            // (inputHardware) и connectStatus — остальные события не нашего состояния.
+            foreach (var prop in payload.EnumerateObject())
+            {
+                if (prop.Value.ValueKind != JsonValueKind.Object)
+                {
+                    continue;
+                }
+
+                if (prop.Name == "clientSelfPropertyUpdated")
+                {
+                    HandleSelfProperty(prop.Value);
+                }
+                else if (prop.Name == "connectStatusChanged")
+                {
+                    HandleConnectStatus(prop.Value);
+                }
+            }
+
             return;
         }
 
@@ -368,6 +391,8 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
                     HandleClientMoved(prop.Value);
                     break;
                 case "clientLeftView":
+                case "clientLeft":
+                case "clientDisconnected":
                     HandleClientLeftView(prop.Value);
                     break;
                 case "channelCreated":
@@ -421,7 +446,18 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
 
     private void HandleClientLeftView(JsonElement payload)
     {
+        var connId = Int(payload, "connectionId");
+        if (connId != 0 && _connectionId != 0 && connId != _connectionId)
+        {
+            return;
+        }
+
         var clientId = Int(payload, "clientId");
+        if (clientId <= 0)
+        {
+            clientId = Int(payload, "id");
+        }
+
         if (clientId <= 0)
         {
             return;
@@ -485,26 +521,51 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
         JsonElement chosen = default;
         var found = false;
         var fallback = false;
-        foreach (var conn in connections.EnumerateArray())
+
+        // Сначала пробуем подключение, которое TS6 уже называл активным в событиях.
+        if (_preferredConnectionId > 0)
         {
-            if (conn.ValueKind != JsonValueKind.Object)
+            foreach (var conn in connections.EnumerateArray())
             {
-                continue;
-            }
+                if (conn.ValueKind != JsonValueKind.Object || Int(conn, "id") != _preferredConnectionId)
+                {
+                    continue;
+                }
 
-            if (!found)
-            {
-                chosen = conn;
-                fallback = true;
-            }
+                var preferredClientId = Int(conn, "clientId");
+                if (preferredClientId > 0 && ConnectionContainsClient(conn, preferredClientId))
+                {
+                    chosen = conn;
+                    found = true;
+                }
 
-            var clientId = Int(conn, "clientId");
-            if (clientId > 0 && ConnectionContainsClient(conn, clientId))
-            {
-                chosen = conn;
-                found = true;
-                fallback = false;
                 break;
+            }
+        }
+
+        if (!found)
+        {
+            foreach (var conn in connections.EnumerateArray())
+            {
+                if (conn.ValueKind != JsonValueKind.Object)
+                {
+                    continue;
+                }
+
+                if (!fallback)
+                {
+                    chosen = conn;
+                    fallback = true;
+                }
+
+                var clientId = Int(conn, "clientId");
+                if (clientId > 0 && ConnectionContainsClient(conn, clientId))
+                {
+                    chosen = conn;
+                    found = true;
+                    fallback = false;
+                    break;
+                }
             }
         }
 
@@ -516,8 +577,25 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
             return;
         }
 
+        var connectionIds = new StringBuilder();
+        foreach (var conn in connections.EnumerateArray())
+        {
+            if (conn.ValueKind != JsonValueKind.Object)
+            {
+                continue;
+            }
+
+            if (connectionIds.Length > 0)
+            {
+                connectionIds.Append(',');
+            }
+
+            connectionIds.Append(Int(conn, "id"));
+        }
+
         ParseConnection(chosen);
-        Log.Info($"TS6: авторизация успешна, подключение {_connectionId}, свой clid={_ownClientId}, cid={_ownChannelId}");
+        _preferredConnectionId = _connectionId;
+        Log.Info($"TS6: подключения [{connectionIds}], выбрано {_connectionId}, свой clid={_ownClientId}, cid={_ownChannelId}");
         SetStatus("TeamSpeak 6: подключено");
         Publish();
     }
@@ -779,8 +857,9 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
     private void HandleClientPropertiesUpdated(JsonElement payload)
     {
         var connId = Int(payload, "connectionId");
-        if (connId != 0 && connId != _connectionId)
+        if (connId != 0 && _connectionId != 0 && connId != _connectionId)
         {
+            // Обновление неактивного подключения: у нас хранится только активное.
             return;
         }
 
@@ -808,7 +887,7 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
     private void HandleTalkStatus(JsonElement payload)
     {
         var connId = Int(payload, "connectionId");
-        if (connId != 0 && connId != _connectionId)
+        if (connId != 0 && _connectionId != 0 && connId != _connectionId)
         {
             return;
         }
@@ -836,10 +915,17 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
         var flag = Str(payload, "flag");
         var newValue = Bool(payload, "newValue");
 
-        if (connId != 0 && connId != _connectionId)
+        // TS6 сообщает о смене активного подключения только так: clientSelfPropertyUpdated
+        // с flag=inputHardware. Это же единственный сигнал, что пользователь переключил сервер.
+        if (string.Equals(flag, "inputHardware", StringComparison.OrdinalIgnoreCase))
         {
-            // Активной стала другая вкладка сервера — переподключаемся, чтобы получить её состояние.
-            RequestResync($"смена активного подключения {connId} (было {_connectionId})");
+            NoteActiveConnection(connId, "смена активного подключения (inputHardware)");
+            return;
+        }
+
+        if (connId != 0 && _connectionId != 0 && connId != _connectionId)
+        {
+            // Событие неактивного сервера — не наше состояние.
             return;
         }
 
@@ -893,7 +979,9 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
 
         if (status == 4)
         {
-            RequestResync($"connectStatus=4 conn={connId} (активно {_connectionId})");
+            // Подключение к серверу установлено. Активное подключение определяется
+            // только событием inputHardware, поэтому здесь ничего не переключаем.
+            Log.Info($"TS6: подключение {connId} установлено");
         }
     }
 
@@ -1005,6 +1093,27 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
     {
         _resyncRequested = true;
         Log.Info("TS6: нужна полная синхронизация — " + reason);
+    }
+
+    /// <summary>
+    /// Запоминает подключение, которое TS6 считает активным, и просит один ресинк,
+    /// чтобы авторизация выбрала именно его. Без этого события с другим connectionId
+    /// бесконечно вызывали реконнект.
+    /// </summary>
+    private void NoteActiveConnection(int connId, string reason)
+    {
+        if (connId <= 0 || connId == _connectionId)
+        {
+            return;
+        }
+
+        var changed = _preferredConnectionId != connId;
+        _preferredConnectionId = connId;
+
+        if (!_resyncRequested || changed)
+        {
+            RequestResync($"{reason}: активное {connId}, текущее {_connectionId}");
+        }
     }
 
     private void Publish()
