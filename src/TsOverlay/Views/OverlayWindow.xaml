@@ -83,7 +83,7 @@
                           Visibility="{Binding HasRows, Converter={StaticResource BoolToVis}}">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate DataType="{x:Type vm:ClientRow}">
-                        <Border Height="{Binding RowHeight}"
+                        <Border MinHeight="{Binding RowHeight}"
                                 Background="{Binding TalkingBackground}"
                                 CornerRadius="6"
                                 Padding="5,0"

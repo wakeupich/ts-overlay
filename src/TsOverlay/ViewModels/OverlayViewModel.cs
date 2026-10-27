@@ -149,7 +149,7 @@ public sealed class OverlayViewModel : ObservableObject
         get
         {
             var rows = HasRows ? Rows.Count : 1;
-            var rowHeight = HasRows ? RowHeight : 22;
+            var rowHeight = HasRows ? RowHeight : Math.Max(22, FontSize * 1.55);
             return PanelPadding * 2 + (ShowHeader ? HeaderHeight : 0) + rows * rowHeight;
         }
     }
@@ -159,14 +159,16 @@ public sealed class OverlayViewModel : ObservableObject
         var o = config.Overlay;
         var scale = o.Scale;
 
-        RowHeight = o.RowHeight * scale;
         FontSize = o.FontSize * scale;
-        SubFontSize = Math.Max(8, o.FontSize * 0.78 * scale);
+        SubFontSize = Math.Max(8, FontSize * 0.78);
+
+        // Строка не может быть ниже текста: иначе при большом шрифте строки наезжают друг на друга.
+        RowHeight = Math.Max(o.RowHeight * scale, FontSize * 1.55 + 2);
+        HeaderHeight = Math.Max(34 * scale, FontSize * 1.25 + SubFontSize * 1.35 + 10);
         CornerRadius = o.CornerRadius;
         PanelOpacity = o.Opacity;
         PanelPadding = 10 * scale;
         ShowHeader = o.ShowHeader;
-        HeaderHeight = 34 * scale;
         PanelBackground = SolidWithOpacity(o.Background, o.Opacity, Color.FromArgb(230, 14, 17, 22));
         TextBrush = Solid(o.TextColor, Color.FromArgb(255, 233, 237, 242));
         DimBrush = Solid(o.DimColor, Color.FromArgb(153, 185, 194, 206));

@@ -178,8 +178,8 @@
                         <GroupBox Header="Отображение">
                             <StackPanel>
                                 <CheckBox x:Name="ShowSelfBox" Content="Показывать себя в списке канала" Margin="0,2" />
-                                <CheckBox x:Name="AlwaysShowBox" Content="Поверх любых окон (пока игра запущена; без списка игр — всегда)" Margin="0,2" />
-                                <TextBlock Text="Без этой галочки оверлей виден только поверх игр из вкладки «Игры»."
+                                <CheckBox x:Name="AlwaysShowBox" Content="Поверх любых окон" Margin="0,2" />
+                                <TextBlock Text="Оверлей виден поверх любых окон, пока запущена игра из списка. Если список игр пуст — всегда."
                                            TextWrapping="Wrap" Foreground="#FF44506A" Margin="0,6,0,0" />
                             </StackPanel>
                         </GroupBox>
@@ -287,11 +287,9 @@
                                     <CheckBox x:Name="ShowGroupBadgesBox" Content="Показывать значки групп" VerticalAlignment="Center" />
                                 </StackPanel>
 
-                                <Button Grid.Row="6" Grid.Column="0" Grid.ColumnSpan="2"
-                                        Content="Предпросмотр на рабочем столе"
-                                        Click="OnPreviewClick"
-                                        HorizontalAlignment="Left"
-                                        Padding="10,3" />
+                                <TextBlock Grid.Row="6" Grid.Column="0" Grid.ColumnSpan="5"
+                                           Text="Перетащить оверлей: зажмите Ctrl+Alt и потяните мышью — позиция сохранится."
+                                           Foreground="#FF44506A" TextWrapping="Wrap" Margin="0,4,0,0" />
                             </Grid>
                         </GroupBox>
 

@@ -11,7 +11,7 @@
     <ApplicationIcon>app.ico</ApplicationIcon>
     <AssemblyName>TsOverlay</AssemblyName>
     <RootNamespace>TsOverlay</RootNamespace>
-    <Version>1.1.9</Version>
+    <Version>1.2.0</Version>
     <AssemblyTitle>TS Overlay</AssemblyTitle>
     <Product>TS Overlay</Product>
     <Company>AlienNation</Company>
@@ -28,6 +28,7 @@
   </ItemGroup>
 
 </Project>
+
 
 
 

@@ -31,6 +31,7 @@ public partial class SettingsWindow : Window
 
         InitializeComponent();
         GamesList.ItemsSource = _games;
+        HookLivePreview();
         Fill(_working, status);
 
         Closed += (_, _) =>
@@ -216,6 +217,45 @@ public partial class SettingsWindow : Window
         }).ToList();
     }
 
+    private void HookLivePreview()
+    {
+        var boxes = new TextBox[]
+        {
+            MarginXBox, MarginYBox, WidthBox, ScaleBox, RowHeightBox, FontSizeBox,
+            MaxRowsBox, CornerRadiusBox,
+            BackgroundBox, TextColorBox, DimColorBox, TalkingColorBox, MutedColorBox,
+        };
+
+        foreach (var box in boxes)
+        {
+            box.TextChanged += (_, _) => QueuePreview();
+        }
+
+        var checks = new CheckBox[]
+        {
+            ShowHeaderBox, ShowServerNameBox, ShowAvatarsBox, ShowGroupBadgesBox,
+        };
+
+        foreach (var check in checks)
+        {
+            check.Checked += (_, _) => QueuePreview();
+            check.Unchecked += (_, _) => QueuePreview();
+        }
+
+        AnchorBox.SelectionChanged += (_, _) => QueuePreview();
+    }
+
+    private void QueuePreview()
+    {
+        if (!IsLoaded)
+        {
+            return;
+        }
+
+        ReadInto(_working);
+        _applyPreview(_working);
+    }
+
     private void OpacitySlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
         if (OpacityValueText != null)
@@ -319,11 +359,6 @@ public partial class SettingsWindow : Window
         }
 
         box.Text = HotkeyService.Format(key, Keyboard.Modifiers);
-    }
-
-    private void OnPreviewClick(object sender, RoutedEventArgs e)    {
-        ReadInto(_working);
-        _applyPreview(_working);
     }
 
     private void OnAddRunning(object sender, RoutedEventArgs e)
