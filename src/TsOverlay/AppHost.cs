@@ -29,6 +29,7 @@ public sealed class AppHost
     private GameWindowInfo? _lastGame;
     private bool _preview;
     private bool _pinned;
+    private bool _suppressed;
     private bool _hudVisible;
     private bool _settingsOpen;
     private AppConfig? _previewConfig;
@@ -201,6 +202,13 @@ public sealed class AppHost
                 return;
             }
 
+            if (_suppressed && !_hudVisible)
+            {
+                // Пользователь скрыл оверлей горячей клавишей — не показываем до повторного нажатия.
+                _tray?.SetStatus("Оверлей скрыт");
+                return;
+            }
+
             if (_hudVisible || _pinned)
             {
                 ShowOverForeground();
@@ -250,6 +258,12 @@ public sealed class AppHost
 
             if (!Config.OverlayEnabled)
             {
+                return;
+            }
+
+            if (_suppressed)
+            {
+                // Скрыто пользователем: смена окон не должна возвращать оверлей.
                 return;
             }
 
@@ -358,6 +372,7 @@ public sealed class AppHost
     /// <summary>Показать оверлей на рабочем столе (флаг --preview и кнопка в настройках).</summary>
     public void ShowPreviewNow()
     {
+        _suppressed = false;
         _preview = true;
         _tray?.SetPreviewChecked(true);
         _viewModel.Apply(_monitor?.Current ?? TsSnapshot.Empty, Config);
@@ -367,6 +382,11 @@ public sealed class AppHost
     private void SetOverlayEnabled(bool enabled)
     {
         Config.OverlayEnabled = enabled;
+        if (enabled)
+        {
+            _suppressed = false;
+        }
+
         _configService.Save();
         ApplyConfig(restartMonitor: false);
         Log.Info("Оверлей " + (enabled ? "включён" : "выключен"));
@@ -443,7 +463,7 @@ public sealed class AppHost
     /// (или всегда, если список игр пуст).</summary>
     private void EnsureAlwaysShowState()
     {
-        if (_overlay == null || !Config.OverlayEnabled || !Config.AlwaysShowOverlay || _settingsOpen)
+        if (_overlay == null || !Config.OverlayEnabled || !Config.AlwaysShowOverlay || _settingsOpen || _suppressed)
         {
             return;
         }
@@ -586,15 +606,47 @@ public sealed class AppHost
 
     private void TogglePinnedOverlay()
     {
-        if (_pinned)
+        if (_overlay == null)
         {
-            _pinned = false;
-            _overlay?.HideOverlay();
             return;
         }
 
-        _pinned = true;
-        ShowOverForeground();
+        if (_overlay.IsShown && !_suppressed)
+        {
+            _suppressed = true;
+            _pinned = false;
+            _overlay.HideOverlay();
+            _tray?.SetStatus("Оверлей скрыт (Ctrl+Alt+O — показать)");
+            return;
+        }
+
+        _suppressed = false;
+        _pinned = false;
+        ShowConfiguredOverlay();
+    }
+
+    /// <summary>Показать оверлей в обычной позиции (не поверх случайного активного окна).</summary>
+    private void ShowConfiguredOverlay()
+    {
+        if (_settingsOpen)
+        {
+            ShowPreview(Config);
+            return;
+        }
+
+        if (Config.AlwaysShowOverlay)
+        {
+            ShowPreview(Config);
+            return;
+        }
+
+        if (_lastGame != null)
+        {
+            _overlay?.ShowOverGame(_lastGame, Config);
+            return;
+        }
+
+        ShowPreview(Config);
     }
 
     /// <summary>Глобальная клавиша: показать «кто говорит» на несколько секунд поверх любого окна.</summary>
@@ -613,7 +665,35 @@ public sealed class AppHost
             {
                 _hudTimer!.Stop();
                 _hudVisible = false;
-                if (!_pinned && _lastGame == null)
+
+                if (_suppressed)
+                {
+                    _overlay?.HideOverlay();
+                }
+                else if (_pinned)
+                {
+                    // остаётся на месте
+                }
+                else if (Config.AlwaysShowOverlay)
+                {
+                    if (ShouldShowAlways())
+                    {
+                        ShowPreview(Config);
+                    }
+                    else
+                    {
+                        _overlay?.HideOverlay();
+                    }
+                }
+                else if (_preview)
+                {
+                    ShowPreview(Config);
+                }
+                else if (_lastGame != null)
+                {
+                    _overlay?.ShowOverGame(_lastGame, Config);
+                }
+                else
                 {
                     _overlay?.HideOverlay();
                 }
@@ -654,6 +734,7 @@ public sealed class AppHost
 
     private void TogglePreview()
     {
+        _suppressed = false;
         _preview = !_preview;
         _tray?.SetPreviewChecked(_preview);
 
@@ -755,6 +836,10 @@ public sealed class AppHost
             _overlay?.HideOverlay();
             _preview = false;
             _tray?.SetPreviewChecked(false);
+        }
+        else if (_suppressed && !_settingsOpen)
+        {
+            _overlay?.HideOverlay();
         }
         else if (Config.AlwaysShowOverlay)
         {
