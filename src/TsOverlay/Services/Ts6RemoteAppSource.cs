@@ -23,6 +23,7 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
 
     private readonly Dictionary<int, TsChannelState> _channels = new();
     private readonly Dictionary<int, TsClientState> _clients = new();
+    private readonly Dictionary<int, int> _connectionClientIds = new();
 
     private Task? _worker;
     private ClientWebSocket? _ws;
@@ -32,6 +33,7 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
     private int _ownChannelId;
     private string _serverName = "";
     private volatile bool _resyncRequested;
+    private volatile bool _reauthRequested;
     private bool _authenticated;
     private bool _authDenied;
     private readonly Dictionary<string, int> _unknownEvents = new();
@@ -181,25 +183,7 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
             await ws.ConnectAsync(new Uri($"ws://127.0.0.1:{_port}/"), connectCts.Token);
         }
 
-        var auth = new
-        {
-            type = "auth",
-            payload = new
-            {
-                identifier = AppIdentifier,
-                version = AppVersion,
-                name = "TS Overlay",
-                description = "Оверлей TeamSpeak: кто в канале, кто говорит, у кого выключен микрофон",
-                content = new
-                {
-                    apiKey = _getApiKey(),
-                },
-            },
-        };
-
-        var json = JsonSerializer.Serialize(auth);
-        await ws.SendAsync(new ArraySegment<byte>(Encoding.UTF8.GetBytes(json)), WebSocketMessageType.Text, true, ct);
-        Log.Info("TS6: отправлен запрос авторизации Remote Apps");
+        await SendAuthAsync(ct);
 
         // Если клиент молчит, значит пользователь ещё не нажал «Разрешить» — подскажем.
         _ = Task.Run(async () =>
@@ -221,6 +205,39 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
             SetStatus("TeamSpeak 6: ожидаю разрешение приложения");
             Publish();
         }, ct);
+    }
+
+    private async Task SendAuthAsync(CancellationToken ct)
+    {
+        var ws = _ws;
+        if (ws == null || ws.State != WebSocketState.Open)
+        {
+            return;
+        }
+
+        var auth = new
+        {
+            type = "auth",
+            payload = new
+            {
+                identifier = AppIdentifier,
+                version = AppVersion,
+                name = "TS Overlay",
+                description = "Оверлей TeamSpeak: кто в канале, кто говорит, у кого выключен микрофон",
+                content = new
+                {
+                    apiKey = _getApiKey(),
+                },
+            },
+        };
+
+        var json = JsonSerializer.Serialize(auth);
+        await ws.SendAsync(
+            new ArraySegment<byte>(Encoding.UTF8.GetBytes(json)),
+            WebSocketMessageType.Text,
+            true,
+            ct);
+        Log.Info("TS6: отправлен запрос авторизации Remote Apps");
     }
 
     private async Task ReceiveLoopAsync(CancellationToken ct)
@@ -248,6 +265,14 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
             accumulator.SetLength(0);
 
             HandleMessage(text);
+
+            if (_reauthRequested && !_resyncRequested)
+            {
+                // Сменилась активная вкладка сервера: обновляем снимок на том же сокете,
+                // без полного переподключения (это ~мс вместо секунд).
+                _reauthRequested = false;
+                await SendAuthAsync(ct);
+            }
 
             if (_resyncRequested)
             {
@@ -347,8 +372,8 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
         var connId = Int(payload, "connectionId");
         if (connId != 0 && _connectionId != 0 && connId != _connectionId)
         {
-            // Даже у неактивного подключения смотрим только сигнал смены активного сервера
-            // (inputHardware) и connectStatus — остальные события не нашего состояния.
+            // Даже у неактивного подключения смотрим сигналы смены активной вкладки:
+            // self-свойства, self-talk/update, self-move и connectStatus.
             foreach (var prop in payload.EnumerateObject())
             {
                 if (prop.Value.ValueKind != JsonValueKind.Object)
@@ -356,13 +381,27 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
                     continue;
                 }
 
-                if (prop.Name == "clientSelfPropertyUpdated")
+                switch (prop.Name)
                 {
-                    HandleSelfProperty(prop.Value);
-                }
-                else if (prop.Name == "connectStatusChanged")
-                {
-                    HandleConnectStatus(prop.Value);
+                    case "clientSelfPropertyUpdated":
+                        HandleSelfProperty(prop.Value);
+                        break;
+                    case "talkStatusChanged":
+                        HandleTalkStatus(prop.Value);
+                        break;
+                    case "clientUpdated":
+                    case "clientPropertiesUpdated":
+                        HandleClientPropertiesUpdated(prop.Value);
+                        break;
+                    case "clientMoved":
+                        HandleClientMoved(prop.Value);
+                        break;
+                    case "clientEnterView":
+                        HandleClientEnterView(prop.Value);
+                        break;
+                    case "connectStatusChanged":
+                        HandleConnectStatus(prop.Value);
+                        break;
                 }
             }
 
@@ -419,6 +458,17 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
     private void HandleClientEnterView(JsonElement payload)
     {
         var clientId = Int(payload, "clientId");
+        var connId = Int(payload, "connectionId");
+        if (connId != 0 && _connectionId != 0 && connId != _connectionId)
+        {
+            if (IsSelfClient(connId, clientId))
+            {
+                NoteActiveConnection(connId, "self enter");
+            }
+
+            return;
+        }
+
         var channelId = Int(payload, "channelToId");
         if (channelId <= 0)
         {
@@ -520,6 +570,22 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
         JsonElement chosen = default;
         var found = false;
 
+        _connectionClientIds.Clear();
+        foreach (var conn in connections.EnumerateArray())
+        {
+            if (conn.ValueKind != JsonValueKind.Object)
+            {
+                continue;
+            }
+
+            var connId = Int(conn, "id");
+            var ownId = Int(conn, "clientId");
+            if (connId > 0 && ownId > 0)
+            {
+                _connectionClientIds[connId] = ownId;
+            }
+        }
+
         // Сначала пробуем подключение, которое TS6 уже называл активным в событиях.
         if (_preferredConnectionId > 0)
         {
@@ -543,9 +609,8 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
 
         if (!found)
         {
-            // Предпочитаем реальное серверное подключение, а не query/пустое:
-            // у реального обычно больше клиентов, а свой клиент — не QUERY.
-            var bestScore = int.MinValue;
+            // Без эвристик: предпочитаем любое подключение, где есть свой клиент.
+            // Активное уточняется self-событиями TS6 (см. HandleSelfProperty).
             foreach (var conn in connections.EnumerateArray())
             {
                 if (conn.ValueKind != JsonValueKind.Object)
@@ -553,12 +618,12 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
                     continue;
                 }
 
-                var score = ConnectionScore(conn);
-                if (score > bestScore)
+                var clientId = Int(conn, "clientId");
+                if (clientId > 0 && ConnectionContainsClient(conn, clientId))
                 {
-                    bestScore = score;
                     chosen = conn;
-                    found = score > int.MinValue;
+                    found = true;
+                    break;
                 }
             }
         }
@@ -593,6 +658,10 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
         Publish();
     }
 
+    /// <summary>Свой ли это клиент для указанного подключения (по данным auth).</summary>
+    private bool IsSelfClient(int connId, int clientId)
+        => clientId > 0 && _connectionClientIds.TryGetValue(connId, out var own) && own == clientId;
+
     private static bool ConnectionContainsClient(JsonElement conn, int clientId)
     {
         if (!conn.TryGetProperty("clientInfos", out var infos) || infos.ValueKind != JsonValueKind.Array)
@@ -609,34 +678,6 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
         }
 
         return false;
-    }
-
-    /// <summary>Чем больше score, тем вероятнее это реальное активное подключение,
-    /// а не query/пустое. Клиент-QUERY штрафуется.</summary>
-    private static int ConnectionScore(JsonElement conn)
-    {
-        var clientId = Int(conn, "clientId");
-        if (clientId <= 0 || !ConnectionContainsClient(conn, clientId))
-        {
-            return int.MinValue;
-        }
-
-        var score = 0;
-        if (conn.TryGetProperty("clientInfos", out var infos) && infos.ValueKind == JsonValueKind.Array)
-        {
-            foreach (var info in infos.EnumerateArray())
-            {
-                score++;
-                if (Int(info, "id") == clientId &&
-                    info.TryGetProperty("properties", out var props) &&
-                    IsQueryClient(props))
-                {
-                    score -= 10000;
-                }
-            }
-        }
-
-        return score;
     }
 
     private void ParseConnection(JsonElement conn)
@@ -816,12 +857,17 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
     private void HandleClientMoved(JsonElement payload)
     {
         var connId = Int(payload, "connectionId");
-        if (connId != 0 && connId != _connectionId)
+        var clientId = Int(payload, "clientId");
+        if (connId != 0 && _connectionId != 0 && connId != _connectionId)
         {
+            if (IsSelfClient(connId, clientId))
+            {
+                NoteActiveConnection(connId, "self moved");
+            }
+
             return;
         }
 
-        var clientId = Int(payload, "clientId");
         var newChannel = Int(payload, "newChannelId");
         if (newChannel <= 0)
         {
@@ -878,13 +924,17 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
     private void HandleClientPropertiesUpdated(JsonElement payload)
     {
         var connId = Int(payload, "connectionId");
+        var clientId = Int(payload, "clientId");
         if (connId != 0 && _connectionId != 0 && connId != _connectionId)
         {
-            // Обновление неактивного подключения: у нас хранится только активное.
+            if (IsSelfClient(connId, clientId))
+            {
+                NoteActiveConnection(connId, "self updated");
+            }
+
             return;
         }
 
-        var clientId = Int(payload, "clientId");
         if (clientId <= 0 || !payload.TryGetProperty("properties", out var props))
         {
             return;
@@ -908,12 +958,17 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
     private void HandleTalkStatus(JsonElement payload)
     {
         var connId = Int(payload, "connectionId");
+        var clientId = Int(payload, "clientId");
         if (connId != 0 && _connectionId != 0 && connId != _connectionId)
         {
+            if (IsSelfClient(connId, clientId))
+            {
+                NoteActiveConnection(connId, "self talk");
+            }
+
             return;
         }
 
-        var clientId = Int(payload, "clientId");
         var status = Int(payload, "status");
         lock (_stateLock)
         {
@@ -936,17 +991,11 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
         var flag = Str(payload, "flag");
         var newValue = Bool(payload, "newValue");
 
-        // TS6 сообщает о смене активного подключения только так: clientSelfPropertyUpdated
-        // с flag=inputHardware. Это же единственный сигнал, что пользователь переключил сервер.
-        if (string.Equals(flag, "inputHardware", StringComparison.OrdinalIgnoreCase))
-        {
-            NoteActiveConnection(connId, "смена активного подключения (inputHardware)");
-            return;
-        }
-
+        // Любое self-событие приходит от активной вкладки сервера: мьют, разговор,
+        // inputHardware и т.п. Если connectionId другой — пользователь переключил сервер.
         if (connId != 0 && _connectionId != 0 && connId != _connectionId)
         {
-            // Событие неактивного сервера — не наше состояние.
+            NoteActiveConnection(connId, $"self {flag}");
             return;
         }
 
@@ -1128,13 +1177,17 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
             return;
         }
 
-        var changed = _preferredConnectionId != connId;
         _preferredConnectionId = connId;
 
-        if (!_resyncRequested || changed)
+        if (_authenticated && _ws is { State: WebSocketState.Open })
         {
-            RequestResync($"{reason}: активное {connId}, текущее {_connectionId}");
+            // Быстрый путь: повторный auth на том же сокете, без переподключения.
+            _reauthRequested = true;
+            Log.Info($"TS6: активное подключение {connId} ({reason}) — обновляю снимок");
+            return;
         }
+
+        RequestResync($"{reason}: активное {connId}, текущее {_connectionId}");
     }
 
     private void Publish()
