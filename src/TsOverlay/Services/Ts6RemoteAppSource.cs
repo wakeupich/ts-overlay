@@ -33,7 +33,7 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
     private int _ownChannelId;
     private string _serverName = "";
     private volatile bool _resyncRequested;
-    private volatile bool _reauthRequested;
+    private volatile bool _fastReconnect;
     private bool _authenticated;
     private bool _authDenied;
     private readonly Dictionary<string, int> _unknownEvents = new();
@@ -156,7 +156,11 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
 
             try
             {
-                await Task.Delay(wasAuthenticated ? TimeSpan.FromSeconds(5) : TimeSpan.FromSeconds(10), ct);
+                var delay = _fastReconnect
+                    ? TimeSpan.FromMilliseconds(250)
+                    : wasAuthenticated ? TimeSpan.FromSeconds(5) : TimeSpan.FromSeconds(10);
+                _fastReconnect = false;
+                await Task.Delay(delay, ct);
             }
             catch (OperationCanceledException)
             {
@@ -265,14 +269,6 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
             accumulator.SetLength(0);
 
             HandleMessage(text);
-
-            if (_reauthRequested && !_resyncRequested)
-            {
-                // Сменилась активная вкладка сервера: обновляем снимок на том же сокете,
-                // без полного переподключения (это ~мс вместо секунд).
-                _reauthRequested = false;
-                await SendAuthAsync(ct);
-            }
 
             if (_resyncRequested)
             {
@@ -1178,15 +1174,10 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
         }
 
         _preferredConnectionId = connId;
+        _fastReconnect = true;
 
-        if (_authenticated && _ws is { State: WebSocketState.Open })
-        {
-            // Быстрый путь: повторный auth на том же сокете, без переподключения.
-            _reauthRequested = true;
-            Log.Info($"TS6: активное подключение {connId} ({reason}) — обновляю снимок");
-            return;
-        }
-
+        // Повторный auth на том же сокете TS6 игнорирует (проверено по логу),
+        // поэтому для смены вкладки переподключаемся — уже с запомненным connectionId.
         RequestResync($"{reason}: активное {connId}, текущее {_connectionId}");
     }
 
