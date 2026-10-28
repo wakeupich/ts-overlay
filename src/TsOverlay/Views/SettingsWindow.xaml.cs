@@ -32,6 +32,7 @@ public partial class SettingsWindow : Window
         _working = Clone(live);
 
         InitializeComponent();
+        Title = $"TS Overlay — настройки · v{UpdateService.CurrentVersion.ToString(3)}";
         GamesList.ItemsSource = _games;
         HookLivePreview();
         Fill(_working, status);

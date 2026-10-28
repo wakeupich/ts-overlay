@@ -98,7 +98,7 @@ public sealed class AppHost
         }
 
         _monitor.Start();
-        Log.Info("TS Overlay запущен");
+        Log.Info($"TS Overlay {UpdateService.CurrentVersion.ToString(3)} запущен");
 
         if (Config.AlwaysShowOverlay && Config.OverlayEnabled)
         {

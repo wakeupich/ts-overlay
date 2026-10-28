@@ -36,8 +36,10 @@ public sealed class TrayService : IDisposable
         _previewItem = new WinForms.ToolStripMenuItem("Показать оверлей на рабочем столе", null, (_, _) => PreviewToggled?.Invoke());
         _startupItem = new WinForms.ToolStripMenuItem("Запускать с Windows", null, (_, _) => StartupChanged?.Invoke(!_startupItem!.Checked));
 
+        var version = UpdateService.CurrentVersion.ToString(3);
         var menu = new WinForms.ContextMenuStrip();
         menu.Items.Add(_statusItem);
+        menu.Items.Add(new WinForms.ToolStripMenuItem($"Версия {version}") { Enabled = false });
         menu.Items.Add(new WinForms.ToolStripSeparator());
         menu.Items.Add(_overlayItem);
         menu.Items.Add(_toggleItem);
@@ -58,7 +60,7 @@ public sealed class TrayService : IDisposable
         _icon = new WinForms.NotifyIcon
         {
             Icon = icon,
-            Text = "TS Overlay",
+            Text = $"TS Overlay {version}",
             Visible = true,
             ContextMenuStrip = menu,
         };
