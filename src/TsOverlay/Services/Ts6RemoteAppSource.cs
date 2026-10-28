@@ -512,15 +512,13 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
 
         if (!payload.TryGetProperty("connections", out var connections) || connections.ValueKind != JsonValueKind.Array)
         {
-            Log.Info("TS6: в ответе auth нет списка подключений");
-            SetStatus("TeamSpeak 6: нет активного подключения к серверу");
-            Publish();
+            Log.Info("TS6: в ответе auth нет списка подключений — повторю позже");
+            RequestResync("в auth нет подключений");
             return;
         }
 
         JsonElement chosen = default;
         var found = false;
-        var fallback = false;
 
         // Сначала пробуем подключение, которое TS6 уже называл активным в событиях.
         if (_preferredConnectionId > 0)
@@ -545,6 +543,9 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
 
         if (!found)
         {
+            // Предпочитаем реальное серверное подключение, а не query/пустое:
+            // у реального обычно больше клиентов, а свой клиент — не QUERY.
+            var bestScore = int.MinValue;
             foreach (var conn in connections.EnumerateArray())
             {
                 if (conn.ValueKind != JsonValueKind.Object)
@@ -552,28 +553,20 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
                     continue;
                 }
 
-                if (!fallback)
+                var score = ConnectionScore(conn);
+                if (score > bestScore)
                 {
+                    bestScore = score;
                     chosen = conn;
-                    fallback = true;
-                }
-
-                var clientId = Int(conn, "clientId");
-                if (clientId > 0 && ConnectionContainsClient(conn, clientId))
-                {
-                    chosen = conn;
-                    found = true;
-                    fallback = false;
-                    break;
+                    found = score > int.MinValue;
                 }
             }
         }
 
-        if (!fallback && !found)
+        if (!found)
         {
-            Log.Info("TS6: нет активных серверных подключений");
-            SetStatus("TeamSpeak 6: нет активного подключения к серверу");
-            Publish();
+            Log.Info("TS6: в auth нет подключения с нашим клиентом — повторю позже");
+            RequestResync("нет активного подключения");
             return;
         }
 
@@ -616,6 +609,34 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
         }
 
         return false;
+    }
+
+    /// <summary>Чем больше score, тем вероятнее это реальное активное подключение,
+    /// а не query/пустое. Клиент-QUERY штрафуется.</summary>
+    private static int ConnectionScore(JsonElement conn)
+    {
+        var clientId = Int(conn, "clientId");
+        if (clientId <= 0 || !ConnectionContainsClient(conn, clientId))
+        {
+            return int.MinValue;
+        }
+
+        var score = 0;
+        if (conn.TryGetProperty("clientInfos", out var infos) && infos.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var info in infos.EnumerateArray())
+            {
+                score++;
+                if (Int(info, "id") == clientId &&
+                    info.TryGetProperty("properties", out var props) &&
+                    IsQueryClient(props))
+                {
+                    score -= 10000;
+                }
+            }
+        }
+
+        return score;
     }
 
     private void ParseConnection(JsonElement conn)

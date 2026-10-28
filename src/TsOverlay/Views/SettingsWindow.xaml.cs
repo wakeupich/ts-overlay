@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
@@ -21,6 +22,7 @@ public partial class SettingsWindow : Window
     private readonly Action _restore;
     private readonly ObservableCollection<GameRow> _games = new();
     private bool _saved;
+    private bool _dirty;
 
     public SettingsWindow(AppConfig live, string status, Action<AppConfig> applyPreview, Action restore)
     {
@@ -41,6 +43,35 @@ public partial class SettingsWindow : Window
                 _restore();
             }
         };
+
+        Closing += OnClosing;
+    }
+
+    private void OnClosing(object? sender, CancelEventArgs e)
+    {
+        if (_saved || !_dirty)
+        {
+            return;
+        }
+
+        var result = MessageBox.Show(
+            "Сохранить изменения перед закрытием?",
+            "TS Overlay",
+            MessageBoxButton.YesNoCancel,
+            MessageBoxImage.Question);
+
+        if (result == MessageBoxResult.Cancel)
+        {
+            e.Cancel = true;
+            return;
+        }
+
+        if (result == MessageBoxResult.Yes)
+        {
+            ReadInto(_working);
+            _saved = true;
+            Saved?.Invoke();
+        }
     }
 
     public event Action? Saved;
@@ -52,6 +83,7 @@ public partial class SettingsWindow : Window
         _working.Overlay.Anchor = "Custom";
         _working.Overlay.CustomOffsetX = offsetX;
         _working.Overlay.CustomOffsetY = offsetY;
+        _dirty = true;
         SelectTag(AnchorBox, "Custom");
     }
 
@@ -169,7 +201,11 @@ public partial class SettingsWindow : Window
         Close();
     }
 
-    private void OnCancel(object sender, RoutedEventArgs e) => Close();
+    private void OnCancel(object sender, RoutedEventArgs e)
+    {
+        _dirty = false;
+        Close();
+    }
 
     private void ReadInto(AppConfig config)
     {
@@ -254,6 +290,7 @@ public partial class SettingsWindow : Window
             return;
         }
 
+        _dirty = true;
         ReadInto(_working);
         _applyPreview(_working);
     }
@@ -267,6 +304,7 @@ public partial class SettingsWindow : Window
 
         if (IsLoaded)
         {
+            _dirty = true;
             ReadInto(_working);
             _applyPreview(_working);
         }
@@ -280,6 +318,7 @@ public partial class SettingsWindow : Window
         }
 
         ScaleBox.Text = e.NewValue.ToString("0.##", CultureInfo.InvariantCulture);
+        _dirty = true;
         ReadInto(_working);
         _applyPreview(_working);
     }
@@ -334,6 +373,7 @@ public partial class SettingsWindow : Window
         if (_colorTarget != null && sender is MenuItem item && item.Tag is string hex)
         {
             _colorTarget.Text = hex;
+            _dirty = true;
             ReadInto(_working);
             _applyPreview(_working);
         }
