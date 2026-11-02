@@ -1,0 +1,13 @@
+<Application x:Class="TsOverlay.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             ShutdownMode="OnExplicitShutdown">
+    <Application.Resources>
+        <Style TargetType="ToolTip">
+            <Setter Property="Background" Value="#FF1B2430" />
+            <Setter Property="Foreground" Value="#FFE9EDF2" />
+            <Setter Property="BorderBrush" Value="#FF33414F" />
+            <Setter Property="Padding" Value="8,4" />
+        </Style>
+    </Application.Resources>
+</Application>

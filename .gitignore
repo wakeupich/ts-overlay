@@ -1,0 +1,10 @@
+bin/
+obj/
+dist/
+dist-standalone/
+*.user
+*.suo
+.vs/
+*.log
+BACKUP-INFO.txt
+tools/backup-to-work.ps1
