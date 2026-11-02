@@ -95,7 +95,6 @@
                                     <ColumnDefinition Width="Auto" />
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
 
                                 <!-- Аватар: инициалы, цвет стабилен для клиента -->
@@ -142,37 +141,8 @@
                                     </TextBlock.Style>
                                 </TextBlock>
 
-                                <!-- Значки серверных групп (TS3) -->
-                                <ItemsControl Grid.Column="3"
-                                              ItemsSource="{Binding Badges}"
-                                              Visibility="{Binding ShowBadges, Converter={StaticResource BoolToVis}}"
-                                              VerticalAlignment="Center"
-                                              MaxWidth="130"
-                                              Margin="4,0,0,0">
-                                    <ItemsControl.ItemsPanel>
-                                        <ItemsPanelTemplate>
-                                            <StackPanel Orientation="Horizontal" />
-                                        </ItemsPanelTemplate>
-                                    </ItemsControl.ItemsPanel>
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <Border Background="{Binding Brush}"
-                                                    CornerRadius="4"
-                                                    Padding="4,0"
-                                                    Margin="0,0,3,0"
-                                                    MaxWidth="90"
-                                                    ToolTip="{Binding Tooltip}">
-                                                <TextBlock Text="{Binding Text}"
-                                                           FontFamily="Segoe UI"
-                                                           FontSize="{Binding FontSize}"
-                                                           Foreground="White"
-                                                           TextTrimming="CharacterEllipsis" />
-                                            </Border>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
 
-                                <StackPanel Grid.Column="4" Orientation="Horizontal" VerticalAlignment="Center">
+                                <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
                                     <!-- Статус «отошёл» -->
                                     <Border Background="#33FFB020"
                                             CornerRadius="4"

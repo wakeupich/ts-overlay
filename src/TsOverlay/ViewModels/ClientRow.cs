@@ -1,16 +1,6 @@
-using System.Collections.ObjectModel;
 using System.Windows.Media;
 
 namespace TsOverlay.ViewModels;
-
-/// <summary>Маленький значок серверной группы рядом с ником.</summary>
-public sealed class GroupBadge
-{
-    public string Text { get; init; } = "";
-    public string Tooltip { get; init; } = "";
-    public Brush Brush { get; init; } = Brushes.SteelBlue;
-    public double FontSize { get; init; } = 9;
-}
 
 /// <summary>Строка оверлея: ник, говорит/молчит, выключен ли микрофон.</summary>
 public sealed class ClientRow : ObservableObject
@@ -37,11 +27,8 @@ public sealed class ClientRow : ObservableObject
     private double _awayFontSize = 10;
     private double _iconSize = 18;
     private bool _showAvatar = true;
-    private bool _showBadges = true;
 
     public int Id { get; init; }
-
-    public ObservableCollection<GroupBadge> Badges { get; } = new();
 
     public string AvatarText
     {
@@ -85,13 +72,6 @@ public sealed class ClientRow : ObservableObject
         get => _showAvatar;
         set => Set(ref _showAvatar, value);
     }
-
-    public bool ShowBadges
-    {
-        get => _showBadges;
-        set => Set(ref _showBadges, value);
-    }
-
 
     public string Nickname
     {

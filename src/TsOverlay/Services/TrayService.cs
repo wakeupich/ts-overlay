@@ -9,53 +9,69 @@ public sealed class TrayService : IDisposable
 {
     private readonly WinForms.NotifyIcon _icon;
     private readonly WinForms.ToolStripMenuItem _statusItem;
+    private readonly WinForms.ToolStripMenuItem _versionItem;
     private readonly WinForms.ToolStripMenuItem _overlayItem;
     private readonly WinForms.ToolStripMenuItem _previewItem;
     private readonly WinForms.ToolStripMenuItem _startupItem;
     private readonly WinForms.ToolStripMenuItem _toggleItem;
     private readonly WinForms.ToolStripMenuItem _hudItem;
     private readonly WinForms.ToolStripMenuItem _alwaysItem;
+    private readonly WinForms.ToolStripMenuItem _dragHintItem;
+    private readonly WinForms.ToolStripMenuItem _settingsItem;
+    private readonly WinForms.ToolStripMenuItem _launchItem;
+    private readonly WinForms.ToolStripMenuItem _reconnectItem;
+    private readonly WinForms.ToolStripMenuItem _updatesItem;
+    private readonly WinForms.ToolStripMenuItem _exitItem;
     private readonly IntPtr _iconHandle;
+    private string _currentToggleHotkey = "";
+    private string _currentHudHotkey = "";
 
     public TrayService()
     {
         var icon = CreateAppIcon(out var handle);
         _iconHandle = handle;
 
-        _statusItem = new WinForms.ToolStripMenuItem("Нет подключения") { Enabled = false };
-        _overlayItem = new WinForms.ToolStripMenuItem("Оверлей включён", null, (_, _) => OverlayEnabledChanged?.Invoke(!_overlayItem!.Checked))
+        _statusItem = new WinForms.ToolStripMenuItem(Loc.Tr("Tray_NoConnection")) { Enabled = false };
+        _versionItem = new WinForms.ToolStripMenuItem($"Версия {UpdateService.CurrentVersion.ToString(3)}") { Enabled = false };
+        _overlayItem = new WinForms.ToolStripMenuItem(Loc.Tr("Tray_OverlayEnabled"), null, (_, _) => OverlayEnabledChanged?.Invoke(!_overlayItem!.Checked))
         {
             CheckOnClick = false,
         };
-        _toggleItem = new WinForms.ToolStripMenuItem("Показать/скрыть оверлей", null, (_, _) => ToggleOverlayRequested?.Invoke());
-        _hudItem = new WinForms.ToolStripMenuItem("Кто говорит (поверх любого окна)", null, (_, _) => TalkingHudRequested?.Invoke());
-        _alwaysItem = new WinForms.ToolStripMenuItem("Поверх любых окон", null, (_, _) => AlwaysShowChanged?.Invoke(!_alwaysItem!.Checked))
+        _toggleItem = new WinForms.ToolStripMenuItem(Loc.Tr("Tray_ToggleOverlay"), null, (_, _) => ToggleOverlayRequested?.Invoke());
+        _hudItem = new WinForms.ToolStripMenuItem(Loc.Tr("Tray_WhoTalking"), null, (_, _) => TalkingHudRequested?.Invoke());
+        _alwaysItem = new WinForms.ToolStripMenuItem(Loc.Tr("Tray_AlwaysOnTop"), null, (_, _) => AlwaysShowChanged?.Invoke(!_alwaysItem!.Checked))
         {
             CheckOnClick = false,
         };
-        _previewItem = new WinForms.ToolStripMenuItem("Показать оверлей на рабочем столе", null, (_, _) => PreviewToggled?.Invoke());
-        _startupItem = new WinForms.ToolStripMenuItem("Запускать с Windows", null, (_, _) => StartupChanged?.Invoke(!_startupItem!.Checked));
+        _dragHintItem = new WinForms.ToolStripMenuItem(Loc.Tr("Tray_DragHint")) { Enabled = false };
+        _previewItem = new WinForms.ToolStripMenuItem(Loc.Tr("Tray_PreviewDesktop"), null, (_, _) => PreviewToggled?.Invoke());
+        _settingsItem = new WinForms.ToolStripMenuItem(Loc.Tr("Tray_Settings"), null, (_, _) => SettingsRequested?.Invoke());
+        _launchItem = new WinForms.ToolStripMenuItem(Loc.Tr("Tray_LaunchTs"), null, (_, _) => LaunchTeamSpeakRequested?.Invoke());
+        _reconnectItem = new WinForms.ToolStripMenuItem(Loc.Tr("Tray_Reconnect"), null, (_, _) => RestartRequested?.Invoke());
+        _updatesItem = new WinForms.ToolStripMenuItem(Loc.Tr("Tray_CheckUpdates"), null, (_, _) => CheckUpdatesRequested?.Invoke());
+        _startupItem = new WinForms.ToolStripMenuItem(Loc.Tr("Tray_StartWithWindows"), null, (_, _) => StartupChanged?.Invoke(!_startupItem!.Checked));
+        _exitItem = new WinForms.ToolStripMenuItem(Loc.Tr("Tray_Exit"), null, (_, _) => ExitRequested?.Invoke());
 
         var version = UpdateService.CurrentVersion.ToString(3);
         var menu = new WinForms.ContextMenuStrip();
         menu.Items.Add(_statusItem);
-        menu.Items.Add(new WinForms.ToolStripMenuItem($"Версия {version}") { Enabled = false });
+        menu.Items.Add(_versionItem);
         menu.Items.Add(new WinForms.ToolStripSeparator());
         menu.Items.Add(_overlayItem);
         menu.Items.Add(_toggleItem);
         menu.Items.Add(_hudItem);
         menu.Items.Add(_alwaysItem);
-        menu.Items.Add(new WinForms.ToolStripMenuItem("Перетащить: Ctrl+Alt + мышь") { Enabled = false });
+        menu.Items.Add(_dragHintItem);
         menu.Items.Add(_previewItem);
-        menu.Items.Add(new WinForms.ToolStripMenuItem("Настройки…", null, (_, _) => SettingsRequested?.Invoke()));
+        menu.Items.Add(_settingsItem);
         menu.Items.Add(new WinForms.ToolStripSeparator());
-        menu.Items.Add(new WinForms.ToolStripMenuItem("Запустить TeamSpeak", null, (_, _) => LaunchTeamSpeakRequested?.Invoke()));
-        menu.Items.Add(new WinForms.ToolStripMenuItem("Переподключиться", null, (_, _) => RestartRequested?.Invoke()));
-        menu.Items.Add(new WinForms.ToolStripMenuItem("Проверить обновления", null, (_, _) => CheckUpdatesRequested?.Invoke()));
+        menu.Items.Add(_launchItem);
+        menu.Items.Add(_reconnectItem);
+        menu.Items.Add(_updatesItem);
         menu.Items.Add(new WinForms.ToolStripSeparator());
         menu.Items.Add(_startupItem);
         menu.Items.Add(new WinForms.ToolStripSeparator());
-        menu.Items.Add(new WinForms.ToolStripMenuItem("Выход", null, (_, _) => ExitRequested?.Invoke()));
+        menu.Items.Add(_exitItem);
 
         _icon = new WinForms.NotifyIcon
         {
@@ -65,6 +81,31 @@ public sealed class TrayService : IDisposable
             ContextMenuStrip = menu,
         };
         _icon.DoubleClick += (_, _) => SettingsRequested?.Invoke();
+
+        Loc.LanguageChanged += OnLanguageChanged;
+        UpdateTexts();
+    }
+
+    private void OnLanguageChanged()
+    {
+        UpdateTexts();
+    }
+
+    private void UpdateTexts()
+    {
+        var v = UpdateService.CurrentVersion.ToString(3);
+        _versionItem.Text = Loc.CurrentLanguage == "en" ? $"Version {v}" : $"Версия {v}";
+        _overlayItem.Text = Loc.Tr("Tray_OverlayEnabled");
+        _alwaysItem.Text = Loc.Tr("Tray_AlwaysOnTop");
+        _dragHintItem.Text = Loc.Tr("Tray_DragHint");
+        _previewItem.Text = Loc.Tr("Tray_PreviewDesktop");
+        _settingsItem.Text = Loc.Tr("Tray_Settings");
+        _launchItem.Text = Loc.Tr("Tray_LaunchTs");
+        _reconnectItem.Text = Loc.Tr("Tray_Reconnect");
+        _updatesItem.Text = Loc.Tr("Tray_CheckUpdates");
+        _startupItem.Text = Loc.Tr("Tray_StartWithWindows");
+        _exitItem.Text = Loc.Tr("Tray_Exit");
+        SetHotkeys(_currentToggleHotkey, _currentHudHotkey);
     }
 
     public event Action? SettingsRequested;
@@ -103,8 +144,12 @@ public sealed class TrayService : IDisposable
 
     public void SetHotkeys(string toggle, string hud)
     {
-        _toggleItem.Text = string.IsNullOrWhiteSpace(toggle) ? "Показать/скрыть оверлей" : $"Показать/скрыть оверлей ({toggle})";
-        _hudItem.Text = string.IsNullOrWhiteSpace(hud) ? "Кто говорит (поверх любого окна)" : $"Кто говорит ({hud})";
+        _currentToggleHotkey = toggle;
+        _currentHudHotkey = hud;
+        var toggleBase = Loc.Tr("Tray_ToggleOverlay");
+        var hudBase = Loc.Tr("Tray_WhoTalking");
+        _toggleItem.Text = string.IsNullOrWhiteSpace(toggle) ? toggleBase : $"{toggleBase} ({toggle})";
+        _hudItem.Text = string.IsNullOrWhiteSpace(hud) ? hudBase : $"{hudBase} ({hud})";
     }
 
     public void SetPreviewChecked(bool value) => _previewItem.Checked = value;
@@ -125,6 +170,7 @@ public sealed class TrayService : IDisposable
 
     public void Dispose()
     {
+        Loc.LanguageChanged -= OnLanguageChanged;
         try
         {
             _icon.Visible = false;

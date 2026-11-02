@@ -195,7 +195,6 @@ public sealed class OverlayViewModel : ObservableObject
             wanted = wanted.Take(o.MaxRows).ToList();
         }
 
-        _groupNames = snapshot.GroupNames;
         SyncRows(wanted, o);
 
         HasRows = Rows.Count > 0;
@@ -291,7 +290,6 @@ public sealed class OverlayViewModel : ObservableObject
         row.AvatarSize = Math.Clamp(RowHeight - 6, 14, 22);
         row.IconSize = Math.Clamp(RowHeight * 0.7, 16, 30);
         row.AvatarFontSize = Math.Max(8, row.AvatarSize * 0.44);
-        UpdateBadges(row, client, settings.ShowGroupBadges);
 
         // Смена этих флагов перерисовывает иконки.
         row.MicMuted = client.InputMuted;
@@ -313,7 +311,6 @@ public sealed class OverlayViewModel : ObservableObject
         Color.FromRgb(0xEC, 0x40, 0x7A),
     };
 
-    private IReadOnlyDictionary<int, string> _groupNames = new Dictionary<int, string>();
 
     private static string Initials(string nickname)
     {
@@ -370,41 +367,7 @@ public sealed class OverlayViewModel : ObservableObject
         return brush;
     }
 
-    private void UpdateBadges(ClientRow row, TsClientState client, bool enabled)
-    {
-        row.Badges.Clear();
-        if (!enabled || client.ServerGroups.Length == 0 || _groupNames.Count == 0)
-        {
-            row.ShowBadges = false;
-            return;
-        }
 
-        foreach (var raw in client.ServerGroups.Split(',', StringSplitOptions.RemoveEmptyEntries))
-        {
-            if (!int.TryParse(raw.Trim(), out var id) || !_groupNames.TryGetValue(id, out var name) || name.Length == 0)
-            {
-                continue;
-            }
-
-            var color = AvatarPalette[Math.Abs(id) % AvatarPalette.Length];
-            var brush = new SolidColorBrush(Color.FromArgb(0xD0, color.R, color.G, color.B));
-            brush.Freeze();
-            row.Badges.Add(new GroupBadge
-            {
-                Text = name.Length <= 10 ? name : name[..9] + "…",
-                Tooltip = name,
-                Brush = brush,
-                FontSize = Math.Max(8, FontSize * 0.62),
-            });
-
-            if (row.Badges.Count >= 2)
-            {
-                break;
-            }
-        }
-
-        row.ShowBadges = row.Badges.Count > 0;
-    }
 
     private static string Plural(int n, string one, string few, string many)
     {

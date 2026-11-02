@@ -32,7 +32,7 @@ public partial class SettingsWindow : Window
         _working = Clone(live);
 
         InitializeComponent();
-        Title = $"TS Overlay — настройки · v{UpdateService.CurrentVersion.ToString(3)}";
+        UpdateTitle();
         GamesList.ItemsSource = _games;
         HookLivePreview();
         Fill(_working, status);
@@ -48,6 +48,24 @@ public partial class SettingsWindow : Window
         Closing += OnClosing;
     }
 
+    private void UpdateTitle()
+    {
+        Title = $"{Loc.Tr("Settings_Title")} · v{UpdateService.CurrentVersion.ToString(3)}";
+    }
+
+    private void LanguageBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!IsLoaded)
+        {
+            return;
+        }
+
+        var lang = SelectedTag(LanguageBox, "auto");
+        Loc.SetLanguage(lang);
+        UpdateTitle();
+        _dirty = true;
+    }
+
     private void OnClosing(object? sender, CancelEventArgs e)
     {
         if (_saved || !_dirty)
@@ -56,7 +74,7 @@ public partial class SettingsWindow : Window
         }
 
         var result = MessageBox.Show(
-            "Сохранить изменения перед закрытием?",
+            Loc.Tr("Settings_SavePrompt"),
             "TS Overlay",
             MessageBoxButton.YesNoCancel,
             MessageBoxImage.Question);
@@ -96,6 +114,7 @@ public partial class SettingsWindow : Window
 
     private void Fill(AppConfig config, string status)
     {
+        SelectTag(LanguageBox, config.Language);
         SelectTag(ClientModeBox, config.ClientMode);
 
         StartWithWindowsBox.IsChecked = StartupService.IsEnabled();
@@ -124,7 +143,6 @@ public partial class SettingsWindow : Window
         ShowHeaderBox.IsChecked = o.ShowHeader;
         ShowServerNameBox.IsChecked = o.ShowServerName;
         ShowAvatarsBox.IsChecked = o.ShowAvatars;
-        ShowGroupBadgesBox.IsChecked = o.ShowGroupBadges;
 
         BackgroundBox.Text = o.Background;
         TextColorBox.Text = o.TextColor;
@@ -210,6 +228,7 @@ public partial class SettingsWindow : Window
 
     private void ReadInto(AppConfig config)
     {
+        config.Language = SelectedTag(LanguageBox, "auto");
         config.ClientMode = SelectedTag(ClientModeBox, "Auto");
         config.AutoLaunchTeamSpeak = AutoLaunchBox.IsChecked == true;
         config.ExitWithTeamSpeak = ExitWithTsBox.IsChecked == true;
@@ -234,7 +253,6 @@ public partial class SettingsWindow : Window
         o.ShowHeader = ShowHeaderBox.IsChecked == true;
         o.ShowServerName = ShowServerNameBox.IsChecked == true;
         o.ShowAvatars = ShowAvatarsBox.IsChecked == true;
-        o.ShowGroupBadges = ShowGroupBadgesBox.IsChecked == true;
 
         o.Background = NormalizeColor(BackgroundBox.Text, o.Background);
         o.TextColor = NormalizeColor(TextColorBox.Text, o.TextColor);
@@ -272,7 +290,7 @@ public partial class SettingsWindow : Window
 
         var checks = new CheckBox[]
         {
-            ShowHeaderBox, ShowServerNameBox, ShowAvatarsBox, ShowGroupBadgesBox,
+            ShowHeaderBox, ShowServerNameBox, ShowAvatarsBox,
         };
 
         foreach (var check in checks)

@@ -8,7 +8,8 @@ namespace TsOverlay.Services;
 
 /// <summary>
 /// Источник данных TeamSpeak 3 через встроенный плагин ClientQuery (TCP 127.0.0.1:25639).
-/// Даёт полный список клиентов канала, флаги микрофона/наушников и события «начал/закончил говорить».
+/// Активным сервером считается тот, на котором ВКЛЮЧЕН МИКРОФОН (client_input_hardware=1).
+/// Переключение вкладок в интерфейсе TS3 оверлей не сбивает.
 /// </summary>
 public sealed class Ts3ClientQuerySource : ITeamSpeakSource
 {
@@ -31,6 +32,7 @@ public sealed class Ts3ClientQuerySource : ITeamSpeakSource
     private readonly object _stateLock = new();
     private readonly Dictionary<int, TsClientState> _clients = new();
     private readonly Dictionary<int, TsChannelState> _channels = new();
+    private readonly Dictionary<int, int> _ownClientIdsByHandler = new();
     private readonly StringBuilder _responseBuffer = new();
 
     private Task? _worker;
@@ -43,10 +45,11 @@ public sealed class Ts3ClientQuerySource : ITeamSpeakSource
     private int _ownClientId;
     private int _ownChannelId;
     private int _selectedHandlerId = -1;
+    private int _activeMicHandlerId = -1;
     private string _serverName = "";
-    private readonly Dictionary<int, string> _groupNames = new();
     private volatile bool _needsRefresh = true;
     private DateTime _lastFullRefresh = DateTime.MinValue;
+    private DateTime _lastMicCheck = DateTime.MinValue;
     private volatile bool _authFailed;
     private string _status = "Подключение к TeamSpeak 3…";
 
@@ -85,7 +88,6 @@ public sealed class Ts3ClientQuerySource : ITeamSpeakSource
     {
         try
         {
-            // CancelAsync не блокирует поток на колбэках сокета.
             await _stop.CancelAsync();
             Cleanup();
             if (_worker != null)
@@ -121,15 +123,28 @@ public sealed class Ts3ClientQuerySource : ITeamSpeakSource
 
                 while (!ct.IsCancellationRequested)
                 {
-                    await Task.Delay(350, ct);
+                    await Task.Delay(250, ct);
 
                     if (_readTask is { IsFaulted: true })
                     {
                         throw new IOException("ClientQuery: обрыв чтения", _readTask.Exception);
                     }
 
-                    var due = _needsRefresh && DateTime.UtcNow - _lastFullRefresh > TimeSpan.FromMilliseconds(600);
-                    var periodic = DateTime.UtcNow - _lastFullRefresh > TimeSpan.FromSeconds(20);
+                    // Периодически (раз в 4 с) проверяем, не сменился ли активный микрофон
+                    if (DateTime.UtcNow - _lastMicCheck > TimeSpan.FromSeconds(4))
+                    {
+                        _lastMicCheck = DateTime.UtcNow;
+                        var micId = await FindActiveMicHandlerAsync();
+                        if (micId > 0 && micId != _activeMicHandlerId)
+                        {
+                            Log.Info($"TS3: обнаружена смена сервера с микрофоном: {micId} (был {_activeMicHandlerId})");
+                            _activeMicHandlerId = micId;
+                            _needsRefresh = true;
+                        }
+                    }
+
+                    var due = _needsRefresh && DateTime.UtcNow - _lastFullRefresh > TimeSpan.FromMilliseconds(250);
+                    var periodic = DateTime.UtcNow - _lastFullRefresh > TimeSpan.FromSeconds(10);
                     if (due || periodic)
                     {
                         _needsRefresh = false;
@@ -151,7 +166,6 @@ public sealed class Ts3ClientQuerySource : ITeamSpeakSource
             }
             catch (Exception ex)
             {
-                // Штатная ситуация (клиент ещё не поднял ClientQuery) — без стектрейса в журнале.
                 Log.Info("TS3: нет связи с ClientQuery — " + ex.Message);
                 Publish(_authFailed ? "Неверный ключ ClientQuery" : "Нет связи с TeamSpeak 3");
             }
@@ -175,7 +189,10 @@ public sealed class Ts3ClientQuerySource : ITeamSpeakSource
     {
         Cleanup();
         _selectedHandlerId = -1;
+        _activeMicHandlerId = -1;
         _lastFullRefresh = DateTime.MinValue;
+        _lastMicCheck = DateTime.MinValue;
+        _ownClientIdsByHandler.Clear();
 
         _tcp = new TcpClient { NoDelay = true };
         await _tcp.ConnectAsync(IPAddress.Loopback, _port, ct);
@@ -203,16 +220,78 @@ public sealed class Ts3ClientQuerySource : ITeamSpeakSource
         }
 
         await CommandAsync("clientnotifyregister schandlerid=0 event=any");
-        // Список серверных групп приходит событием, поэтому подписываемся и просим его.
-        await CommandAsync("clientnotifyregister schandlerid=0 event=notifyservergrouplist");
-        await CommandAsync("servergrouplist");
-        Log.Info("TS3: ClientQuery подключён");
+
+        _activeMicHandlerId = await FindActiveMicHandlerAsync();
+        _selectedHandlerId = _activeMicHandlerId;
+        Log.Info($"TS3: ClientQuery подключён, активный микрофон на schandlerid={_activeMicHandlerId}");
+    }
+
+    /// <summary>
+    /// Ищет среди открытых серверов тот, на котором включен микрофон (client_input_hardware=1).
+    /// </summary>
+    private async Task<int> FindActiveMicHandlerAsync()
+    {
+        try
+        {
+            var listRes = await CommandAsync("serverconnectionhandlerlist");
+            var items = Ts3Protocol.ParseResponse(listRes.Response).Items;
+            var handlers = new List<int>();
+            foreach (var item in items)
+            {
+                var id = Ts3Protocol.Int(item, "schandlerid");
+                if (id > 0)
+                {
+                    handlers.Add(id);
+                }
+            }
+
+            if (handlers.Count == 0)
+            {
+                handlers.Add(1);
+            }
+
+            foreach (var hid in handlers)
+            {
+                var useRes = await CommandAsync($"use schandlerid={hid}");
+                if (!useRes.Ok)
+                {
+                    continue;
+                }
+
+                var whoRes = await CommandAsync("whoami");
+                var whoItems = Ts3Protocol.ParseResponse(whoRes.Response).Items;
+                if (!whoRes.Ok || whoItems.Count == 0)
+                {
+                    continue;
+                }
+
+                var ownClid = Ts3Protocol.Int(whoItems[0], "clid");
+                if (ownClid <= 0)
+                {
+                    continue;
+                }
+
+                _ownClientIdsByHandler[hid] = ownClid;
+
+                var varRes = await CommandAsync($"clientvariable clid={ownClid} client_input_hardware");
+                var varItems = Ts3Protocol.ParseResponse(varRes.Response).Items;
+                if (varItems.Count > 0 && Ts3Protocol.Bool(varItems[0], "client_input_hardware"))
+                {
+                    return hid;
+                }
+            }
+
+            return handlers[0];
+        }
+        catch (Exception ex)
+        {
+            Log.Info("TS3: ошибка определения сервера с микрофоном: " + ex.Message);
+            return _activeMicHandlerId > 0 ? _activeMicHandlerId : 1;
+        }
     }
 
     private async Task ReadGreetingAsync(CancellationToken ct)
     {
-        // Приветствие — несколько строк, заканчивается строкой "selected schandlerid=N".
-        // Если строка не пришла (старая версия плагина), просто продолжаем.
         for (var i = 0; i < 12; i++)
         {
             if (_reader == null)
@@ -266,13 +345,7 @@ public sealed class Ts3ClientQuerySource : ITeamSpeakSource
 
                 if (line.StartsWith("selected schandlerid=", StringComparison.Ordinal))
                 {
-                    // Плагин повторяет эту строку часто; перечитываем состояние только при реальной смене.
-                    if (int.TryParse(line["selected schandlerid=".Length..].Trim(), out var handlerId) && handlerId != _selectedHandlerId)
-                    {
-                        _selectedHandlerId = handlerId;
-                        _needsRefresh = true;
-                    }
-
+                    // Игнорируем авто-переключение от кликов по вкладкам в GUI.
                     continue;
                 }
 
@@ -327,6 +400,21 @@ public sealed class Ts3ClientQuerySource : ITeamSpeakSource
 
     private async Task RefreshAsync()
     {
+        // Всегда строго остаёмся на сервере, где включен микрофон!
+        if (_activeMicHandlerId <= 0)
+        {
+            _activeMicHandlerId = await FindActiveMicHandlerAsync();
+        }
+
+        var useRes = await CommandAsync($"use schandlerid={_activeMicHandlerId}");
+        if (!useRes.Ok)
+        {
+            _activeMicHandlerId = await FindActiveMicHandlerAsync();
+            await CommandAsync($"use schandlerid={_activeMicHandlerId}");
+        }
+
+        _selectedHandlerId = _activeMicHandlerId;
+
         var who = await CommandAsync("whoami");
         var whoItems = Ts3Protocol.ParseResponse(who.Response).Items;
         if (!who.Ok || whoItems.Count == 0)
@@ -339,6 +427,7 @@ public sealed class Ts3ClientQuerySource : ITeamSpeakSource
                 _channels.Clear();
             }
 
+            Log.Info($"TS3: whoami вернул ошибку на schandler={_selectedHandlerId}: err={who.ErrorId} msg={who.Message}");
             Publish("TeamSpeak 3 не подключён к серверу");
             return;
         }
@@ -346,6 +435,11 @@ public sealed class Ts3ClientQuerySource : ITeamSpeakSource
         var self = whoItems[0];
         var ownId = Ts3Protocol.Int(self, "clid");
         var ownCid = Ts3Protocol.Int(self, "cid");
+
+        if (_selectedHandlerId > 0 && ownId > 0)
+        {
+            _ownClientIdsByHandler[_selectedHandlerId] = ownId;
+        }
 
         var server = await CommandAsync("servervariable virtualserver_name");
         var serverName = "";
@@ -356,7 +450,7 @@ public sealed class Ts3ClientQuerySource : ITeamSpeakSource
         }
 
         var channelsResponse = await CommandAsync("channellist");
-        var clientsResponse = await CommandAsync("clientlist -uid -away -voice -groups");
+        var clientsResponse = await CommandAsync("clientlist -uid -away -voice");
 
         var channels = new Dictionary<int, TsChannelState>();
         foreach (var item in Ts3Protocol.ParseResponse(channelsResponse.Response).Items)
@@ -404,7 +498,7 @@ public sealed class Ts3ClientQuerySource : ITeamSpeakSource
                 ChannelCommander = Ts3Protocol.Bool(item, "client_is_channel_commander"),
                 IsSelf = id == ownId,
                 IsQuery = type == 1,
-                ServerGroups = Ts3Protocol.Str(item, "client_servergroups"),
+                ServerGroups = "",
             };
         }
 
@@ -438,6 +532,7 @@ public sealed class Ts3ClientQuerySource : ITeamSpeakSource
 
         _lastFullRefresh = DateTime.UtcNow;
         _status = "TeamSpeak 3: подключено";
+        Log.Info($"TS3: рефреш schandler={_selectedHandlerId} сервер='{serverName}' свой_clid={ownId} клиентов={clients.Count}");
         Publish(null);
     }
 
@@ -471,6 +566,7 @@ public sealed class Ts3ClientQuerySource : ITeamSpeakSource
         var space = line.IndexOf(' ');
         var name = space < 0 ? line : line[..space];
         var fields = Ts3Protocol.ParseFields(space < 0 ? "" : line[(space + 1)..]);
+        var schandlerid = Ts3Protocol.Int(fields, "schandlerid");
         var changed = false;
 
         switch (name)
@@ -479,15 +575,35 @@ public sealed class Ts3ClientQuerySource : ITeamSpeakSource
             {
                 var clid = Ts3Protocol.Int(fields, "clid");
                 var status = Ts3Protocol.Int(fields, "status");
-                lock (_stateLock)
+
+                // Если заговорил сам пользователь на другой вкладке:
+                if (status == 1 && schandlerid > 0 && _activeMicHandlerId > 0 && schandlerid != _activeMicHandlerId)
                 {
-                    if (_clients.TryGetValue(clid, out var client))
+                    var isSelf = (clid == _ownClientId) ||
+                                 (_ownClientIdsByHandler.TryGetValue(schandlerid, out var knownId) && knownId == clid);
+
+                    if (isSelf)
                     {
-                        var talking = status == 1;
-                        if (client.Talking != talking)
+                        Log.Info($"TS3: речь на сервере schandlerid={schandlerid}, переключаем сервер");
+                        _activeMicHandlerId = schandlerid;
+                        _needsRefresh = true;
+                        break;
+                    }
+                }
+
+                // События речи на текущем сервере:
+                if (schandlerid <= 0 || schandlerid == _activeMicHandlerId)
+                {
+                    lock (_stateLock)
+                    {
+                        if (_clients.TryGetValue(clid, out var client))
                         {
-                            _clients[clid] = client.Copy(talking: talking);
-                            changed = true;
+                            var talking = status == 1;
+                            if (client.Talking != talking)
+                            {
+                                _clients[clid] = client.Copy(talking: talking);
+                                changed = true;
+                            }
                         }
                     }
                 }
@@ -498,6 +614,29 @@ public sealed class Ts3ClientQuerySource : ITeamSpeakSource
             case "notifyclientupdated":
             {
                 var clid = Ts3Protocol.Int(fields, "clid");
+
+                // Маркер: включение микрофона (кнопка «Включить микрофон» на панели TS3)
+                if (fields.ContainsKey("client_input_hardware"))
+                {
+                    var hasHardware = Ts3Protocol.Bool(fields, "client_input_hardware");
+                    var isSelf = (schandlerid == _activeMicHandlerId && clid == _ownClientId) ||
+                                 (_ownClientIdsByHandler.TryGetValue(schandlerid, out var myClid) && myClid == clid);
+
+                    if (hasHardware && isSelf && schandlerid > 0 && schandlerid != _activeMicHandlerId)
+                    {
+                        Log.Info($"TS3: кнопка «Включить микрофон» нажата на сервере schandlerid={schandlerid}! Переключаем оверлей.");
+                        _activeMicHandlerId = schandlerid;
+                        _needsRefresh = true;
+                        break;
+                    }
+                }
+
+                // Игнорируем события с чужих серверов
+                if (schandlerid > 0 && _activeMicHandlerId > 0 && schandlerid != _activeMicHandlerId)
+                {
+                    break;
+                }
+
                 lock (_stateLock)
                 {
                     if (_clients.TryGetValue(clid, out var client))
@@ -519,8 +658,31 @@ public sealed class Ts3ClientQuerySource : ITeamSpeakSource
                 break;
             }
 
+            case "notifyconnectstatuschange":
+            {
+                var status = Ts3Protocol.Str(fields, "status");
+                if (status == "disconnected")
+                {
+                    if (schandlerid > 0)
+                    {
+                        _ownClientIdsByHandler.Remove(schandlerid);
+                    }
+                    if (schandlerid == _activeMicHandlerId)
+                    {
+                        _activeMicHandlerId = -1;
+                    }
+                }
+                _needsRefresh = true;
+                break;
+            }
+
             case "notifyclientmoved":
             {
+                if (schandlerid > 0 && _activeMicHandlerId > 0 && schandlerid != _activeMicHandlerId)
+                {
+                    break;
+                }
+
                 var clid = Ts3Protocol.Int(fields, "clid");
                 var ctid = Ts3Protocol.Int(fields, "ctid");
                 var isSelf = false;
@@ -548,6 +710,11 @@ public sealed class Ts3ClientQuerySource : ITeamSpeakSource
 
             case "notifyclientleftview":
             {
+                if (schandlerid > 0 && _activeMicHandlerId > 0 && schandlerid != _activeMicHandlerId)
+                {
+                    break;
+                }
+
                 var clid = Ts3Protocol.Int(fields, "clid");
                 lock (_stateLock)
                 {
@@ -561,48 +728,21 @@ public sealed class Ts3ClientQuerySource : ITeamSpeakSource
                 break;
             }
 
-            case "notifyservergrouplist":
-            {
-                var payload = space < 0 ? "" : line[(space + 1)..];
-                var names = new Dictionary<int, string>();
-                foreach (var part in payload.Split('|'))
-                {
-                    var group = Ts3Protocol.ParseFields(part.Trim());
-                    var sgid = Ts3Protocol.Int(group, "sgid");
-                    var groupName = Ts3Protocol.Str(group, "name");
-                    if (sgid > 0 && groupName.Length > 0)
-                    {
-                        names[sgid] = groupName;
-                    }
-                }
-
-                if (names.Count > 0)
-                {
-                    lock (_stateLock)
-                    {
-                        _groupNames.Clear();
-                        foreach (var kv in names)
-                        {
-                            _groupNames[kv.Key] = kv.Value;
-                        }
-                    }
-
-                    changed = true;
-                }
-
-                break;
-            }
-
             case "notifycliententerview":
-            case "notifyconnectstatuschange":
-            case "notifycurrentserverconnectionchanged":
             case "notifychannelcreated":
             case "notifychanneledited":
             case "notifychanneldeleted":
             case "notifychannelmoved":
             case "notifyserverupdated":
             case "notifyserveredited":
-                _needsRefresh = true;
+                if (schandlerid <= 0 || schandlerid == _activeMicHandlerId)
+                {
+                    _needsRefresh = true;
+                }
+                break;
+
+            case "notifycurrentserverconnectionchanged":
+                // Игнорируем: смена вкладки GUI не меняет сервер оверлея
                 break;
         }
 
@@ -630,7 +770,7 @@ public sealed class Ts3ClientQuerySource : ITeamSpeakSource
                 ChannelName = channelName,
                 Channels = _channels.Values.ToArray(),
                 Clients = _clients.Values.ToArray(),
-                GroupNames = new Dictionary<int, string>(_groupNames),
+                GroupNames = new Dictionary<int, string>(),
             };
         }
 

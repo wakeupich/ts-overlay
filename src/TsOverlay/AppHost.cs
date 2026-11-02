@@ -44,6 +44,7 @@ public sealed class AppHost
         var firstRun = !_configService.Exists;
         _configService.Load();
         var config = Config;
+        Loc.Initialize(config.Language);
 
         _overlay = new OverlayWindow(_viewModel);
         _overlay.Configure(config);

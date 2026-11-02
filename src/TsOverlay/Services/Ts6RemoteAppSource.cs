@@ -12,7 +12,7 @@ namespace TsOverlay.Services;
 /// </summary>
 public sealed class Ts6RemoteAppSource : ITeamSpeakSource
 {
-    private const string AppIdentifier = "io.github.wakeupich.tsoverlay";
+    private const string AppIdentifier = "lv.aliennation.tsoverlay";
     private const string AppVersion = "1.0.0";
     private static readonly bool TraceEnabled = Environment.GetEnvironmentVariable("TSOVERLAY_TRACE") == "1";
 
@@ -195,7 +195,7 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
         {
             try
             {
-                await Task.Delay(TimeSpan.FromSeconds(6), ct);
+                await Task.Delay(TimeSpan.FromSeconds(3), ct);
             }
             catch (OperationCanceledException)
             {
@@ -207,8 +207,15 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
                 return;
             }
 
-            SetStatus("TeamSpeak 6: ожидаю разрешение приложения");
+            SetStatus(Loc.Tr("Status_Ts6_WaitingAuth"));
             Publish();
+
+            var now = DateTime.UtcNow;
+            if (now - _lastPermissionNotice > TimeSpan.FromMinutes(2))
+            {
+                _lastPermissionNotice = now;
+                UserNotice?.Invoke(Loc.Tr("Notice_Ts6_Permission"));
+            }
         }, ct);
     }
 

@@ -7,6 +7,9 @@ public sealed class AppConfig
     /// <summary>Auto | Ts3 | Ts6</summary>
     public string ClientMode { get; set; } = "Auto";
 
+    /// <summary>auto | ru | en</summary>
+    public string Language { get; set; } = "auto";
+
     public string Ts3ApiKey { get; set; } = "";
     public int Ts3Port { get; set; } = 25639;
     public string Ts3Path { get; set; } = "";
