@@ -150,7 +150,15 @@ public sealed class OverlayViewModel : ObservableObject
         {
             var rows = HasRows ? Rows.Count : 1;
             var rowHeight = HasRows ? RowHeight : Math.Max(22, FontSize * 1.55);
-            return PanelPadding * 2 + (ShowHeader ? HeaderHeight : 0) + rows * rowHeight;
+            // Панель имеет:
+            // - Внутренние отступы PanelPadding сверху и снизу
+            // - Рамку панели BorderThickness 1px сверху и 1px снизу = 2px
+            // - Шапку HeaderHeight (если ShowHeader == true)
+            // - Строки клиентов: каждая строка занимает rowHeight, плюс Margin.Bottom = 1px между строками
+            // - Запас 4px на субпиксельный рендеринг шрифтов и вертикальное выравнивание значков (аватары, мут, AFK)
+            var baseHeight = PanelPadding * 2 + 2 + (ShowHeader ? HeaderHeight : 0);
+            var contentHeight = rows * (rowHeight + 1);
+            return baseHeight + contentHeight + 4;
         }
     }
 
@@ -163,7 +171,8 @@ public sealed class OverlayViewModel : ObservableObject
         SubFontSize = Math.Max(8, FontSize * 0.78);
 
         // Строка не может быть ниже текста: иначе при большом шрифте строки наезжают друг на друга.
-        RowHeight = Math.Max(o.RowHeight * scale, FontSize * 1.55 + 2);
+        var minRow = o.ShowAvatars ? Math.Max(FontSize * 1.55 + 2, 20 * scale) : (FontSize * 1.55 + 2);
+        RowHeight = Math.Max(o.RowHeight * scale, minRow);
         HeaderHeight = Math.Max(34 * scale, FontSize * 1.25 + SubFontSize * 1.35 + 10);
         CornerRadius = o.CornerRadius;
         PanelOpacity = o.Opacity;

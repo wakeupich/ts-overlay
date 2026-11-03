@@ -5,9 +5,9 @@
         Title="TS Overlay"
         Icon="pack://application:,,,/app.ico"
         Width="820"
-        Height="700"
+        Height="730"
         MinWidth="720"
-        MinHeight="600"
+        MinHeight="620"
         WindowStartupLocation="CenterScreen"
         Background="#FFF3F5F8">
     <Window.Resources>
@@ -98,8 +98,8 @@
             <Setter Property="Padding" Value="4,2" />
         </Style>
         <Style TargetType="GroupBox">
-            <Setter Property="Margin" Value="0,0,0,10" />
-            <Setter Property="Padding" Value="10" />
+            <Setter Property="Margin" Value="0,0,0,8" />
+            <Setter Property="Padding" Value="10,6" />
         </Style>
         <Style TargetType="TextBlock">
             <Setter Property="VerticalAlignment" Value="Center" />
@@ -119,24 +119,22 @@
             <TabItem Header="{DynamicResource Loc_Tab_General}">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel Margin="10">
-                        <GroupBox Header="{DynamicResource Loc_Language_Label}">
-                            <Grid Margin="0,2">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="200" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Text="{DynamicResource Loc_Language_Label}" />
-                                <ComboBox x:Name="LanguageBox" Grid.Column="1" SelectionChanged="LanguageBox_SelectionChanged">
-                                    <ComboBoxItem Tag="auto" Content="{DynamicResource Loc_Lang_Auto}" />
-                                    <ComboBoxItem Tag="ru" Content="{DynamicResource Loc_Lang_Ru}" />
-                                    <ComboBoxItem Tag="en" Content="{DynamicResource Loc_Lang_En}" />
-                                </ComboBox>
-                            </Grid>
-                        </GroupBox>
-
-                        <GroupBox Header="{DynamicResource Loc_Client_Header}">
+                        <GroupBox Header="{DynamicResource Loc_General_App_Header}">
                             <StackPanel>
-                                <Grid Margin="0,0,0,8">
+                                <Grid Margin="0,0,0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="200" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="{DynamicResource Loc_Language_Label}" />
+                                    <ComboBox x:Name="LanguageBox" Grid.Column="1" SelectionChanged="LanguageBox_SelectionChanged">
+                                        <ComboBoxItem Tag="auto" Content="{DynamicResource Loc_Lang_Auto}" />
+                                        <ComboBoxItem Tag="ru" Content="{DynamicResource Loc_Lang_Ru}" />
+                                        <ComboBoxItem Tag="en" Content="{DynamicResource Loc_Lang_En}" />
+                                    </ComboBox>
+                                </Grid>
+
+                                <Grid Margin="0,0,0,6">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="200" />
                                         <ColumnDefinition Width="*" />
@@ -148,8 +146,9 @@
                                         <ComboBoxItem Tag="Ts6" Content="{DynamicResource Loc_Client_Mode_Ts6}" />
                                     </ComboBox>
                                 </Grid>
-                                <TextBlock Text="{DynamicResource Loc_Status_Label}" FontWeight="SemiBold" Margin="0,4,0,2" />
-                                <TextBlock x:Name="StatusText" TextWrapping="Wrap" Foreground="#FF44506A" Margin="0,0,0,6" />
+
+                                <TextBlock Text="{DynamicResource Loc_Status_Label}" FontWeight="SemiBold" Margin="0,2,0,2" />
+                                <TextBlock x:Name="StatusText" TextWrapping="Wrap" Foreground="#FF44506A" Margin="0,0,0,4" />
                             </StackPanel>
                         </GroupBox>
 

@@ -24,6 +24,7 @@ public static class Loc
         ["Lang_En"] = ("English", "English"),
 
         // Клиент TeamSpeak
+        ["General_App_Header"] = ("Приложение и клиент", "Application & Client"),
         ["Client_Header"] = ("Клиент TeamSpeak", "TeamSpeak Client"),
         ["Client_Mode"] = ("Какой клиент использовать", "Client to use"),
         ["Client_Mode_Auto"] = ("Автоматически (запущенный)", "Automatic (running client)"),

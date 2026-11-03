@@ -121,9 +121,21 @@ public partial class OverlayWindow : Window
 
         var width = _config.Overlay.Width * _config.Overlay.Scale;
         Width = Math.Max(120, width);
-        Height = Math.Max(40, ViewModel.PanelHeight);
         RootBorder.Padding = new Thickness(ViewModel.PanelPadding);
         RootBorder.CornerRadius = new CornerRadius(ViewModel.CornerRadius);
+
+        // Запрашиваем у WPF реальный измеренный размер дерева элементов панели
+        RootBorder.Measure(new Size(Width, double.PositiveInfinity));
+        var measuredHeight = RootBorder.DesiredSize.Height;
+
+        var computedHeight = Math.Max(ViewModel.PanelHeight, Math.Ceiling(measuredHeight));
+        Height = Math.Max(40, computedHeight);
+
+        // Если окно уже показано в игре или предпросмотре — синхронизируем размер Win32-окна
+        if (IsVisible && _hwnd != IntPtr.Zero && _currentArea.Right > _currentArea.Left)
+        {
+            Position(_currentArea, _currentDpi, null);
+        }
     }
 
     public void ShowOverGame(GameWindowInfo info, AppConfig config)
@@ -179,8 +191,8 @@ public partial class OverlayWindow : Window
         var marginX = profile?.MarginX ?? o.MarginX;
         var marginY = profile?.MarginY ?? o.MarginY;
 
-        var widthPx = Math.Max(120, (int)Math.Round(Width * dpiScale));
-        var heightPx = Math.Max(40, (int)Math.Round(Height * dpiScale));
+        var widthPx = Math.Max(120, (int)Math.Ceiling(Width * dpiScale));
+        var heightPx = Math.Max(40, (int)Math.Ceiling(Height * dpiScale));
         var mx = (int)Math.Round(marginX * dpiScale);
         var my = (int)Math.Round(marginY * dpiScale);
 
