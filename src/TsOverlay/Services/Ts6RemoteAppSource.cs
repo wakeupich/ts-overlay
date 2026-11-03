@@ -28,6 +28,7 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
 
     private Task? _worker;
     private ClientWebSocket? _ws;
+    private CancellationTokenSource? _authWaitCts;
     private int _connectionId;
     private int _preferredConnectionId;
     private int _ownClientId;
@@ -134,24 +135,24 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
                 if (_authDenied)
                 {
                     // Приложение действительно не разрешено в клиенте — напоминаем редко.
-                    SetStatus("TeamSpeak 6: доступ запрещён — разрешите приложение");
+                    SetStatus(Loc.Tr("Status_Ts6_AccessDenied"));
                     if (now - _lastPermissionNotice > TimeSpan.FromMinutes(10))
                     {
                         _lastPermissionNotice = now;
-                        UserNotice?.Invoke("TeamSpeak 6: разрешите подключение оверлея в клиенте (Настройки → Remote Apps).");
+                        UserNotice?.Invoke(Loc.Tr("Notice_Ts6_Permission"));
                     }
                 }
                 else
                 {
                     // Сервер/клиент временно недоступен — это не отказ в разрешениях.
-                    SetStatus("TeamSpeak 6: нет связи, переподключаюсь…");
+                    SetStatus(Loc.Tr("Status_Ts6_Reconnecting"));
                 }
 
                 Publish();
             }
             else
             {
-                SetStatus("TeamSpeak 6: нет связи, переподключаюсь…");
+                SetStatus(Loc.Tr("Status_Ts6_Reconnecting"));
                 Publish();
             }
 
@@ -159,7 +160,7 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
             {
                 var delay = _fastReconnect
                     ? TimeSpan.FromMilliseconds(250)
-                    : wasAuthenticated ? TimeSpan.FromSeconds(5) : TimeSpan.FromSeconds(10);
+                    : wasAuthenticated ? TimeSpan.FromSeconds(2) : TimeSpan.FromSeconds(3);
                 _fastReconnect = false;
                 await Task.Delay(delay, ct);
             }
@@ -190,33 +191,40 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
 
         await SendAuthAsync(ct);
 
-        // Если клиент молчит, значит пользователь ещё не нажал «Разрешить» — подскажем.
-        _ = Task.Run(async () =>
+        // Если ключа ещё нет — значит это первый запуск или пользователь сбросил ключ.
+        // Запустим отменяемый таймер ожидания разрешения в клиенте TeamSpeak.
+        // Если ключ УЖЕ есть в конфигурации — подсказку не показываем, ждём штатного ответа auth от TS6.
+        if (string.IsNullOrEmpty(_getApiKey()))
         {
-            try
+            var authWaitCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            _authWaitCts = authWaitCts;
+            _ = Task.Run(async () =>
             {
-                await Task.Delay(TimeSpan.FromSeconds(3), ct);
-            }
-            catch (OperationCanceledException)
-            {
-                return;
-            }
+                try
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(3), authWaitCts.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                    return;
+                }
 
-            if (_authenticated)
-            {
-                return;
-            }
+                if (_authenticated || authWaitCts.IsCancellationRequested)
+                {
+                    return;
+                }
 
-            SetStatus(Loc.Tr("Status_Ts6_WaitingAuth"));
-            Publish();
+                SetStatus(Loc.Tr("Status_Ts6_WaitingAuth"));
+                Publish();
 
-            var now = DateTime.UtcNow;
-            if (now - _lastPermissionNotice > TimeSpan.FromMinutes(2))
-            {
-                _lastPermissionNotice = now;
-                UserNotice?.Invoke(Loc.Tr("Notice_Ts6_Permission"));
-            }
-        }, ct);
+                var now = DateTime.UtcNow;
+                if (now - _lastPermissionNotice > TimeSpan.FromMinutes(2))
+                {
+                    _lastPermissionNotice = now;
+                    UserNotice?.Invoke(Loc.Tr("Notice_Ts6_Permission"));
+                }
+            }, authWaitCts.Token);
+        }
     }
 
     private async Task SendAuthAsync(CancellationToken ct)
@@ -547,6 +555,19 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
 
     private void HandleAuth(JsonElement root, JsonElement payload)
     {
+        var authWait = Interlocked.Exchange(ref _authWaitCts, null);
+        if (authWait != null)
+        {
+            try
+            {
+                authWait.Cancel();
+                authWait.Dispose();
+            }
+            catch
+            {
+            }
+        }
+
         if (TraceEnabled)
         {
             var keys = new StringBuilder();
@@ -570,7 +591,13 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
         {
             _authDenied = true;
             Log.Error($"TS6: авторизация отклонена ({statusCode} {statusMessage})");
-            SetStatus("TeamSpeak 6: доступ запрещён — разрешите приложение");
+            SetStatus(Loc.Tr("Status_Ts6_AccessDenied"));
+            var now = DateTime.UtcNow;
+            if (now - _lastPermissionNotice > TimeSpan.FromMinutes(2))
+            {
+                _lastPermissionNotice = now;
+                UserNotice?.Invoke(Loc.Tr("Notice_Ts6_Permission"));
+            }
             Publish();
             return;
         }
@@ -578,6 +605,15 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
         _authDenied = false;
 
         var apiKey = Str(payload, "apiKey");
+        if (string.IsNullOrEmpty(apiKey) && payload.TryGetProperty("content", out var contentElem) && contentElem.ValueKind == JsonValueKind.Object)
+        {
+            apiKey = Str(contentElem, "apiKey");
+        }
+        if (string.IsNullOrEmpty(apiKey) && payload.TryGetProperty("auth", out var authElem) && authElem.ValueKind == JsonValueKind.Object)
+        {
+            apiKey = Str(authElem, "apiKey");
+        }
+
         if (apiKey.Length > 0 && apiKey != _getApiKey())
         {
             _saveApiKey(apiKey);
@@ -1159,7 +1195,8 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
                     _ownChannelId = 0;
                 }
 
-                SetStatus("TeamSpeak 6 не подключён к серверу");
+                _connectionId = 0;
+                SetStatus(Loc.Tr("Status_Ts6_NotConnected"));
                 Publish();
             }
 
@@ -1168,9 +1205,28 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
 
         if (status == 4)
         {
-            // Подключение к серверу установлено. Активное подключение определяется
-            // только событием inputHardware, поэтому здесь ничего не переключаем.
             Log.Info($"TS6: подключение {connId} установлено");
+            if (connId <= 0)
+            {
+                return;
+            }
+
+            var isEmpty = false;
+            lock (_stateLock)
+            {
+                isEmpty = _clients.Count == 0 || _ownClientId == 0;
+            }
+
+            if (_connectionId == 0 || isEmpty)
+            {
+                _preferredConnectionId = connId;
+                _fastReconnect = true;
+                RequestResync($"connectStatus=4 conn={connId} (активное={_connectionId}, пусто={isEmpty})");
+            }
+            else if (connId != _connectionId)
+            {
+                Log.Info($"TS6: фоновое подключение {connId} активно, но оверлей уже на {_connectionId}");
+            }
         }
     }
 
@@ -1316,7 +1372,7 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
             {
                 Source = TsClientKind.Ts6,
                 Connected = connected,
-                Status = connected ? _status : (_status.StartsWith("TeamSpeak 6: подключено", StringComparison.Ordinal) ? "TeamSpeak 6 не подключён к серверу" : _status),
+                Status = connected ? _status : (_status.Contains("подключено", StringComparison.OrdinalIgnoreCase) || _status.Contains("connected", StringComparison.OrdinalIgnoreCase) ? Loc.Tr("Status_Ts6_NotConnected") : _status),
                 ServerName = _serverName,
                 OwnClientId = _ownClientId,
                 CurrentChannelId = _ownChannelId,
@@ -1336,6 +1392,19 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
     /// </summary>
     private void CloseSocket()
     {
+        var authWait = Interlocked.Exchange(ref _authWaitCts, null);
+        if (authWait != null)
+        {
+            try
+            {
+                authWait.Cancel();
+                authWait.Dispose();
+            }
+            catch
+            {
+            }
+        }
+
         var ws = Interlocked.Exchange(ref _ws, null);
         if (ws == null)
         {
