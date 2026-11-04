@@ -488,7 +488,12 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
         var connId = Int(payload, "connectionId");
         if (connId != 0 && _connectionId != 0 && connId != _connectionId)
         {
-            // Вход на неактивном сервере не означает смену вкладки.
+            // Свой клиент вошёл в канал на другом подключении — значит оно стало активным.
+            if (IsSelfClient(connId, clientId))
+            {
+                NoteActiveConnection(connId, "self enter");
+            }
+
             return;
         }
 
@@ -502,6 +507,11 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
         {
             RequestResync("clientEnterView без id/канала/свойств");
             return;
+        }
+
+        if (TraceEnabled)
+        {
+            Log.Info($"TRACE enter conn={connId} client={clientId} channel={channelId} own={_ownClientId} active={_connectionId}");
         }
 
         lock (_stateLock)
@@ -1006,7 +1016,12 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
         var clientId = Int(payload, "clientId");
         if (connId != 0 && _connectionId != 0 && connId != _connectionId)
         {
-            // Перемещение на неактивном сервере не означает смену вкладки.
+            // Свой клиент переместился на другом подключении — это и есть активный сервер.
+            if (IsSelfClient(connId, clientId))
+            {
+                NoteActiveConnection(connId, "self moved");
+            }
+
             return;
         }
 
@@ -1020,6 +1035,13 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
         if (oldChannel <= 0)
         {
             oldChannel = Int(payload, "channelFromId");
+        }
+
+        if (TraceEnabled)
+        {
+            Log.Info($"TRACE moved conn={connId} client={clientId} new={newChannel} old={oldChannel} " +
+                     $"rawNew={Int(payload, "newChannelId")} rawTo={Int(payload, "channelToId")} " +
+                     $"rawChannel={Int(payload, "channelId")} own={_ownClientId} active={_connectionId}");
         }
 
         if (clientId <= 0)
