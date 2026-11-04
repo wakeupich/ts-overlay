@@ -518,10 +518,10 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
         {
             var isSelf = clientId == _ownClientId;
             _clients[clientId] = BuildClient(clientId, channelId, props, isSelf);
-
-            // TS6 не присылает отдельное событие «я перешёл в канал». Но при подписке
-            // на новый канал приходят clientEnterView с его id — это и есть текущий канал.
-            _ownChannelId = channelId;
+            if (isSelf)
+            {
+                _ownChannelId = channelId;
+            }
         }
 
         Publish();
@@ -1062,16 +1062,15 @@ public sealed class Ts6RemoteAppSource : ITeamSpeakSource
                     ? previous
                     : new TsClientState { Id = clientId, IsSelf = isSelf };
                 _clients[clientId] = ApplyProperties(baseClient, props).Copy(channelId: newChannel, isSelf: isSelf);
-                if (isSelf || oldChannel <= 0)
+                if (isSelf)
                 {
-                    // oldChannel<=0 — клиент попал в наш просмотр, значит это текущий канал.
                     _ownChannelId = newChannel;
                 }
             }
             else if (_clients.TryGetValue(clientId, out var existing))
             {
                 _clients[clientId] = existing.Copy(channelId: newChannel);
-                if (clientId == _ownClientId || oldChannel <= 0)
+                if (clientId == _ownClientId)
                 {
                     _ownChannelId = newChannel;
                 }
